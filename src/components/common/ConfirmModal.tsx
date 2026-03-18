@@ -1,8 +1,6 @@
 'use client';
 
 import React from 'react';
-import Modal from '@salesforce/design-system-react/components/modal';
-import Button from '@salesforce/design-system-react/components/button';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -25,27 +23,26 @@ export default function ConfirmModal({
   onCancel,
   isLoading = false,
 }: ConfirmModalProps) {
+  if (!isOpen) return null;
+
   return (
-    <Modal
-      isOpen={isOpen}
-      heading={heading}
-      onRequestClose={onCancel}
-      prompt="warning"
-      size="small"
-      footer={[
-        <Button key="cancel" label={cancelLabel} onClick={onCancel} disabled={isLoading} />,
-        <Button
-          key="confirm"
-          label={isLoading ? 'Processing...' : confirmLabel}
-          variant="destructive"
-          onClick={onConfirm}
-          disabled={isLoading}
-        />,
-      ]}
-    >
-      <div className="slds-p-around_medium">
-        <p>{message}</p>
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <div className="modal-header">
+          <h2>{heading}</h2>
+        </div>
+        <div className="modal-body">
+          <p>{message}</p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-pill-outline" onClick={onCancel} disabled={isLoading}>
+            {cancelLabel}
+          </button>
+          <button className="btn-pill-filled" onClick={onConfirm} disabled={isLoading}>
+            {isLoading ? 'Processing...' : confirmLabel}
+          </button>
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 }

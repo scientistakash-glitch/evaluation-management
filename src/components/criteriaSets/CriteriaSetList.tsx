@@ -1,9 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import PageHeader from '@salesforce/design-system-react/components/page-header';
-import Button from '@salesforce/design-system-react/components/button';
-import Card from '@salesforce/design-system-react/components/card';
 import { CriteriaSet } from '@/types';
 import CriteriaSetForm from './CriteriaSetForm';
 import ConfirmModal from '../common/ConfirmModal';
@@ -55,87 +52,74 @@ export default function CriteriaSetList({ initialSets }: CriteriaSetListProps) {
 
   return (
     <div>
-      <PageHeader
-        label="Evaluation Criteria"
-        title="Criteria Sets"
-        variant="object-home"
-        onRenderActions={() => (
-          <Button
-            label="New Criteria Set"
-            variant="brand"
-            onClick={() => {
-              setEditData(null);
-              setIsFormOpen(true);
-            }}
-          />
-        )}
-      />
+      <div className="page-header">
+        <div>
+          <div style={{ fontSize: '12px', color: '#706e6b', marginBottom: '4px' }}>Evaluation Criteria</div>
+          <h1 className="page-title">Criteria Sets</h1>
+        </div>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setEditData(null);
+            setIsFormOpen(true);
+          }}
+        >
+          New Criteria Set
+        </button>
+      </div>
 
-      <div className="slds-grid slds-wrap slds-gutters slds-m-top_medium">
-        {sets.length === 0 && (
-          <div className="slds-col slds-size_1-of-1" style={{ textAlign: 'center', padding: '40px', color: '#706e6b' }}>
-            No criteria sets yet. Create one to get started.
-          </div>
-        )}
-        {sets.map((cs) => (
-          <div key={cs.id} className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-            <Card
-              heading={cs.name}
-              headerActions={
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <Button
-                    label="Edit"
-                    variant="icon"
-                    onClick={() => {
-                      setEditData(cs);
-                      setIsFormOpen(true);
-                    }}
-                  />
-                  <Button
-                    label="Delete"
-                    variant="icon"
-                    onClick={() => setDeleteTarget(cs)}
-                  />
-                </div>
-              }
-            >
-              <div className="slds-p-around_medium">
-                {cs.description && (
-                  <p style={{ color: '#706e6b', marginBottom: '12px', fontSize: '13px' }}>{cs.description}</p>
-                )}
-                <div>
-                  {cs.criteria.map((c) => (
-                    <div
-                      key={c.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '6px 0',
-                        borderBottom: '1px solid #f3f3f3',
+      <div style={{ marginTop: '16px' }}>
+        <table className="table-custom">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Criteria Count</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sets.length === 0 && (
+              <tr>
+                <td colSpan={4} style={{ textAlign: 'center', color: '#706e6b', padding: '32px' }}>
+                  No criteria sets yet. Create one to get started.
+                </td>
+              </tr>
+            )}
+            {sets.map((cs) => (
+              <tr key={cs.id}>
+                <td>
+                  <Link href={`/criteria-sets/${cs.id}`} style={{ color: '#0070d2', textDecoration: 'none' }}>
+                    {cs.name}
+                  </Link>
+                </td>
+                <td style={{ color: '#706e6b', fontSize: '13px' }}>{cs.description || '—'}</td>
+                <td>{cs.criteria.length}</td>
+                <td>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="icon-btn"
+                      title="Edit"
+                      onClick={() => {
+                        setEditData(cs);
+                        setIsFormOpen(true);
                       }}
                     >
-                      <span style={{ fontSize: '13px' }}>{c.name}</span>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        {c.sourceField && (
-                          <span style={{ fontSize: '11px', color: '#706e6b', background: '#f3f3f3', padding: '2px 6px', borderRadius: '3px' }}>
-                            {c.sourceField}
-                          </span>
-                        )}
-                        <span style={{ fontWeight: 700, color: '#0070d2', fontSize: '14px' }}>{c.weightage}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: '12px' }}>
-                  <Link href={`/criteria-sets/${cs.id}`} style={{ color: '#0070d2', fontSize: '13px' }}>
-                    View Details →
-                  </Link>
-                </div>
-              </div>
-            </Card>
-          </div>
-        ))}
+                      ✏️
+                    </button>
+                    <button
+                      className="icon-btn"
+                      title="Delete"
+                      onClick={() => setDeleteTarget(cs)}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <CriteriaSetForm

@@ -1,10 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Modal from '@salesforce/design-system-react/components/modal';
-import Input from '@salesforce/design-system-react/components/input';
-import Button from '@salesforce/design-system-react/components/button';
-import Combobox from '@salesforce/design-system-react/components/combobox';
 import { LPP, PTAT } from '@/types';
 import { useToast } from '../common/ToastContext';
 
@@ -20,7 +16,6 @@ export default function LppForm({ isOpen, onClose, onSuccess, editData, defaultP
   const { showToast } = useToast();
   const [ptats, setPtats] = useState<PTAT[]>([]);
   const [ptatId, setPtatId] = useState('');
-  const [ptatSelection, setPtatSelection] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [duration, setDuration] = useState('4');
@@ -45,13 +40,6 @@ export default function LppForm({ isOpen, onClose, onSuccess, editData, defaultP
     }
     setErrors({});
   }, [editData, isOpen, defaultPtatId]);
-
-  useEffect(() => {
-    if (ptatId && ptats.length > 0) {
-      const p = ptats.find((pt) => pt.id === ptatId);
-      if (p) setPtatSelection([{ id: p.id, label: p.name }]);
-    }
-  }, [ptatId, ptats]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -97,72 +85,70 @@ export default function LppForm({ isOpen, onClose, onSuccess, editData, defaultP
     }
   };
 
-  const ptatOptions = ptats.map((p) => ({ id: p.id, label: p.name }));
+  if (!isOpen) return null;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      heading={editData ? 'Edit LPP' : 'New Learning Program'}
-      onRequestClose={onClose}
-      size="small"
-      footer={[
-        <Button key="cancel" label="Cancel" onClick={onClose} disabled={isLoading} />,
-        <Button
-          key="save"
-          label={isLoading ? 'Saving...' : 'Save'}
-          variant="brand"
-          onClick={handleSubmit}
-          disabled={isLoading}
-        />,
-      ]}
-    >
-      <div className="slds-p-around_medium slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <Combobox
-            id="lpp-ptat"
-            labels={{ label: 'PTAT', placeholder: 'Select PTAT...' }}
-            options={ptatOptions}
-            selection={ptatSelection}
-            value=""
-            events={{
-              onSelect: (_e: any, { selection }: any) => {
-                setPtatSelection(selection);
-                setPtatId(selection[0]?.id ?? '');
-              },
-            }}
-            variant="readonly"
-            errorText={errors.ptatId}
-          />
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <div className="modal-header">
+          <h2>{editData ? 'Edit LPP' : 'New Learning Program'}</h2>
         </div>
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <Input
-            label="Name"
-            value={name}
-            onChange={(_e: any, data: { value: string }) => setName(data.value)}
-            required
-            errorText={errors.name}
-          />
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">PTAT</label>
+            <select
+              className="form-select"
+              value={ptatId}
+              onChange={(e) => setPtatId(e.target.value)}
+            >
+              <option value="">Select PTAT...</option>
+              {ptats.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            {errors.ptatId && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.ptatId}</span>}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Name</label>
+            <input
+              className="form-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            {errors.name && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.name}</span>}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Code</label>
+            <input
+              className="form-input"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            {errors.code && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.code}</span>}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Duration (years)</label>
+            <input
+              className="form-input"
+              type="number"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+            />
+            {errors.duration && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.duration}</span>}
+          </div>
         </div>
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <Input
-            label="Code"
-            value={code}
-            onChange={(_e: any, data: { value: string }) => setCode(data.value)}
-            required
-            errorText={errors.code}
-          />
-        </div>
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <Input
-            label="Duration (years)"
-            type="number"
-            value={duration}
-            onChange={(_e: any, data: { value: string }) => setDuration(data.value)}
-            required
-            errorText={errors.duration}
-          />
+        <div className="modal-footer">
+          <button className="btn-pill-outline" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </button>
+          <button className="btn-pill-filled" onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

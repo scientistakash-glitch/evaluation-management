@@ -1,12 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import PageHeader from '@salesforce/design-system-react/components/page-header';
-import Card from '@salesforce/design-system-react/components/card';
-import DataTable from '@salesforce/design-system-react/components/data-table';
-import DataTableColumn from '@salesforce/design-system-react/components/data-table/column';
-import DataTableRowActions from '@salesforce/design-system-react/components/data-table/row-actions';
-import Button from '@salesforce/design-system-react/components/button';
 import { PTAT, LPP } from '@/types';
 import LppForm from '../lpps/LppForm';
 import ConfirmModal from '../common/ConfirmModal';
@@ -17,11 +11,6 @@ interface Props {
   ptat: PTAT;
   initialLpps: LPP[];
 }
-
-const LPP_ROW_ACTIONS = [
-  { label: 'Edit', value: 'edit' },
-  { label: 'Delete', value: 'delete' },
-];
 
 export default function PtatDetailClient({ ptat, initialLpps }: Props) {
   const { showToast } = useToast();
@@ -36,17 +25,6 @@ export default function PtatDetailClient({ ptat, initialLpps }: Props) {
     createdDate: new Date(l.createdAt).toLocaleDateString(),
     durationYears: `${l.duration} year${l.duration !== 1 ? 's' : ''}`,
   }));
-
-  const handleLppRowAction = (item: any, action: { value: string }) => {
-    const lpp = lpps.find((l) => l.id === item.id);
-    if (!lpp) return;
-    if (action.value === 'edit') {
-      setEditLpp(lpp);
-      setIsLppFormOpen(true);
-    } else if (action.value === 'delete') {
-      setDeleteLppTarget(lpp);
-    }
-  };
 
   const handleLppSuccess = (lpp: LPP) => {
     setLpps((prev) => {
@@ -81,71 +59,103 @@ export default function PtatDetailClient({ ptat, initialLpps }: Props) {
 
   return (
     <div>
-      <PageHeader
-        label="PTAT Detail"
-        title={ptat.name}
-        variant="record-home"
-        onRenderActions={() => (
-          <Link href="/ptats">
-            <Button label="Back to PTATs" />
-          </Link>
-        )}
-      />
+      <div className="page-header">
+        <div>
+          <div style={{ fontSize: '12px', color: '#706e6b', marginBottom: '4px' }}>PTAT Detail</div>
+          <h1 className="page-title">{ptat.name}</h1>
+        </div>
+        <Link href="/ptats">
+          <button className="btn-secondary">Back to PTATs</button>
+        </Link>
+      </div>
 
-      <Card
-        heading="PTAT Information"
-        className="slds-m-top_medium"
-      >
-        <div className="slds-p-around_medium slds-grid slds-wrap slds-gutters">
-          <div className="slds-col slds-size_1-of-3">
-            <div className="slds-form-element">
-              <label className="slds-form-element__label">Name</label>
-              <div className="slds-form-element__control">
-                <span className="slds-form-element__static">{ptat.name}</span>
-              </div>
-            </div>
+      <div className="card" style={{ marginTop: '16px', padding: '24px' }}>
+        <h3 style={{ fontWeight: 700, color: '#3e3e3c', marginBottom: '16px' }}>PTAT Information</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          <div>
+            <div style={{ fontSize: '12px', color: '#706e6b', marginBottom: '4px' }}>Name</div>
+            <div style={{ fontWeight: 500 }}>{ptat.name}</div>
           </div>
-          <div className="slds-col slds-size_1-of-3">
-            <div className="slds-form-element">
-              <label className="slds-form-element__label">Code</label>
-              <div className="slds-form-element__control">
-                <span className="slds-form-element__static">{ptat.code}</span>
-              </div>
-            </div>
+          <div>
+            <div style={{ fontSize: '12px', color: '#706e6b', marginBottom: '4px' }}>Code</div>
+            <div style={{ fontWeight: 500 }}>{ptat.code}</div>
           </div>
-          <div className="slds-col slds-size_1-of-3">
-            <div className="slds-form-element">
-              <label className="slds-form-element__label">Description</label>
-              <div className="slds-form-element__control">
-                <span className="slds-form-element__static">{ptat.description || '—'}</span>
-              </div>
-            </div>
+          <div>
+            <div style={{ fontSize: '12px', color: '#706e6b', marginBottom: '4px' }}>Description</div>
+            <div style={{ fontWeight: 500 }}>{ptat.description || '—'}</div>
           </div>
         </div>
-      </Card>
+      </div>
 
-      <Card
-        heading={`Learning Programs (${lpps.length})`}
-        className="slds-m-top_medium"
-        headerActions={
-          <Button
-            label="Add LPP"
-            variant="brand"
+      <div className="card" style={{ marginTop: '16px', padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ fontWeight: 700, color: '#3e3e3c', margin: 0 }}>
+            Learning Programs ({lpps.length})
+          </h3>
+          <button
+            className="btn-primary"
             onClick={() => {
               setEditLpp(null);
               setIsLppFormOpen(true);
             }}
-          />
-        }
-      >
-        <DataTable items={tableItems} id="lpps-table">
-          <DataTableColumn label="Name" property="name" primaryColumn />
-          <DataTableColumn label="Code" property="code" />
-          <DataTableColumn label="Duration" property="durationYears" />
-          <DataTableColumn label="Created Date" property="createdDate" />
-          <DataTableRowActions options={LPP_ROW_ACTIONS} onAction={handleLppRowAction} />
-        </DataTable>
-      </Card>
+          >
+            Add LPP
+          </button>
+        </div>
+
+        <table className="table-custom">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Code</th>
+              <th>Duration</th>
+              <th>Created Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableItems.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', color: '#706e6b', padding: '32px' }}>
+                  No learning programs found.
+                </td>
+              </tr>
+            )}
+            {tableItems.map((item) => (
+              <tr key={item.id}>
+                <td>{item.name}</td>
+                <td>{item.code}</td>
+                <td>{item.durationYears}</td>
+                <td>{item.createdDate}</td>
+                <td>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '12px' }}
+                      onClick={() => {
+                        const lpp = lpps.find((l) => l.id === item.id);
+                        if (lpp) { setEditLpp(lpp); setIsLppFormOpen(true); }
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '12px', color: '#ba0517', borderColor: '#ba0517' }}
+                      onClick={() => {
+                        const lpp = lpps.find((l) => l.id === item.id);
+                        if (lpp) setDeleteLppTarget(lpp);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <LppForm
         isOpen={isLppFormOpen}

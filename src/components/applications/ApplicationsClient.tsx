@@ -1,24 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import DataTable from '@salesforce/design-system-react/components/data-table';
-import DataTableColumn from '@salesforce/design-system-react/components/data-table/column';
-import DataTableCell from '@salesforce/design-system-react/components/data-table/cell';
-import PageHeader from '@salesforce/design-system-react/components/page-header';
-import Input from '@salesforce/design-system-react/components/input';
 import { Application } from '@/types';
 import StatusBadge from '../common/StatusBadge';
 
 interface ApplicationsClientProps {
   initialApplications: Application[];
 }
-
-const CategoryCell = ({ item, ...props }: any) => (
-  <DataTableCell {...props} item={item}>
-    <StatusBadge status={item?.category ?? ''} />
-  </DataTableCell>
-);
-CategoryCell.displayName = DataTableCell.displayName;
 
 export default function ApplicationsClient({ initialApplications }: ApplicationsClientProps) {
   const [search, setSearch] = useState('');
@@ -37,33 +25,59 @@ export default function ApplicationsClient({ initialApplications }: Applications
 
   return (
     <div>
-      <PageHeader
-        label="Student Applications"
-        title={`Applications (${initialApplications.length})`}
-        variant="object-home"
-      />
-      <div className="slds-card slds-m-top_medium">
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #dddbda' }}>
-          <div style={{ maxWidth: '360px' }}>
-            <Input
-              id="app-search"
-              label=""
+      <div className="page-header">
+        <div>
+          <div style={{ fontSize: '12px', color: '#706e6b', marginBottom: '4px' }}>Student Applications</div>
+          <h1 className="page-title">Applications ({initialApplications.length})</h1>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <div style={{ padding: '12px 0', marginBottom: '8px', maxWidth: '360px' }}>
+          <div className="search-wrapper">
+            <span className="search-icon">🔍</span>
+            <input
+              className="search-input"
               placeholder="Search by name or roll number..."
               value={search}
-              onChange={(_e: any, data: { value: string }) => setSearch(data.value)}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
-        <DataTable items={tableItems} id="applications-table">
-          <DataTableColumn label="Roll Number" property="rollNumber" primaryColumn />
-          <DataTableColumn label="Name" property="studentName" />
-          <DataTableColumn label="Category" property="category">
-            <CategoryCell />
-          </DataTableColumn>
-          <DataTableColumn label="Entrance Score" property="entranceScoreDisplay" />
-          <DataTableColumn label="Academic Score" property="academicScoreDisplay" />
-          <DataTableColumn label="Application Date" property="applicationDate" />
-        </DataTable>
+
+        <table className="table-custom">
+          <thead>
+            <tr>
+              <th>Roll Number</th>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Entrance Score</th>
+              <th>Academic Score</th>
+              <th>Application Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableItems.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', color: '#706e6b', padding: '32px' }}>
+                  No applications found.
+                </td>
+              </tr>
+            )}
+            {tableItems.map((item) => (
+              <tr key={item.id}>
+                <td>{item.rollNumber}</td>
+                <td>{item.studentName}</td>
+                <td>
+                  <span className="badge badge-default">{item.category}</span>
+                </td>
+                <td>{item.entranceScoreDisplay}</td>
+                <td>{item.academicScoreDisplay}</td>
+                <td>{item.applicationDate}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

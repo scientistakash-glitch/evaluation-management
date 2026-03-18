@@ -1,10 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Modal from '@salesforce/design-system-react/components/modal';
-import Input from '@salesforce/design-system-react/components/input';
-import Textarea from '@salesforce/design-system-react/components/textarea';
-import Button from '@salesforce/design-system-react/components/button';
 import { PTAT } from '@/types';
 import { useToast } from '../common/ToastContext';
 
@@ -77,50 +73,55 @@ export default function PtatForm({ isOpen, onClose, onSuccess, editData }: PtatF
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Modal
-      isOpen={isOpen}
-      heading={editData ? 'Edit PTAT' : 'New PTAT'}
-      onRequestClose={onClose}
-      size="small"
-      footer={[
-        <Button key="cancel" label="Cancel" onClick={onClose} disabled={isLoading} />,
-        <Button
-          key="save"
-          label={isLoading ? 'Saving...' : 'Save'}
-          variant="brand"
-          onClick={handleSubmit}
-          disabled={isLoading}
-        />,
-      ]}
-    >
-      <div className="slds-p-around_medium slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <Input
-            label="Name"
-            value={name}
-            onChange={(_e: any, data: { value: string }) => setName(data.value)}
-            required
-            errorText={errors.name}
-          />
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <div className="modal-header">
+          <h2>{editData ? 'Edit PTAT' : 'New PTAT'}</h2>
         </div>
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <Input
-            label="Code"
-            value={code}
-            onChange={(_e: any, data: { value: string }) => setCode(data.value)}
-            required
-            errorText={errors.code}
-          />
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Name</label>
+            <input
+              className="form-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            {errors.name && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.name}</span>}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Code</label>
+            <input
+              className="form-input"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            {errors.code && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.code}</span>}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <textarea
+              className="form-input"
+              value={description}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
         </div>
-        <div className="slds-col slds-size_1-of-1 slds-m-bottom_medium">
-          <Textarea
-            label="Description"
-            value={description}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-          />
+        <div className="modal-footer">
+          <button className="btn-pill-outline" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </button>
+          <button className="btn-pill-filled" onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

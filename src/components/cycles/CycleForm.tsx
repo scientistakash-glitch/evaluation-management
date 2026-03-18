@@ -1,10 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Modal from '@salesforce/design-system-react/components/modal';
-import Input from '@salesforce/design-system-react/components/input';
-import Button from '@salesforce/design-system-react/components/button';
-import Combobox from '@salesforce/design-system-react/components/combobox';
 import { Cycle, CycleStatus, PTAT, LPP } from '@/types';
 import { useToast } from '../common/ToastContext';
 
@@ -15,21 +11,15 @@ interface CycleFormProps {
   editData?: Cycle | null;
 }
 
-const STATUS_OPTIONS = [
-  { id: 'Planned', label: 'Planned' },
-  { id: 'Active', label: 'Active' },
-  { id: 'Closed', label: 'Closed' },
-];
+const STATUS_OPTIONS = ['Planned', 'Active', 'Closed'];
 
 export default function CycleForm({ isOpen, onClose, onSuccess, editData }: CycleFormProps) {
   const { showToast } = useToast();
   const [ptats, setPtats] = useState<PTAT[]>([]);
   const [lpps, setLpps] = useState<LPP[]>([]);
   const [ptatId, setPtatId] = useState('');
-  const [ptatSelection, setPtatSelection] = useState<any[]>([]);
   const [lppId, setLppId] = useState('');
-  const [lppSelection, setLppSelection] = useState<any[]>([]);
-  const [statusSelection, setStatusSelection] = useState<any[]>([{ id: 'Planned', label: 'Planned' }]);
+  const [status, setStatus] = useState<string>('Planned');
   const [academicYear, setAcademicYear] = useState('');
   const [cycleNumber, setCycleNumber] = useState('1');
   const [startDate, setStartDate] = useState('');
@@ -60,34 +50,18 @@ export default function CycleForm({ isOpen, onClose, onSuccess, editData }: Cycl
       setCycleNumber(String(editData.cycleNumber));
       setStartDate(editData.startDate);
       setEndDate(editData.endDate);
-      setStatusSelection([{ id: editData.status, label: editData.status }]);
+      setStatus(editData.status);
     } else {
       setPtatId('');
-      setPtatSelection([]);
       setLppId('');
-      setLppSelection([]);
       setAcademicYear('');
       setCycleNumber('1');
       setStartDate('');
       setEndDate('');
-      setStatusSelection([{ id: 'Planned', label: 'Planned' }]);
+      setStatus('Planned');
     }
     setErrors({});
   }, [editData, isOpen]);
-
-  useEffect(() => {
-    if (editData && ptats.length > 0) {
-      const p = ptats.find((pt) => pt.id === editData.ptatId);
-      if (p) setPtatSelection([{ id: p.id, label: p.name }]);
-    }
-  }, [editData, ptats]);
-
-  useEffect(() => {
-    if (editData && lpps.length > 0) {
-      const l = lpps.find((lp) => lp.id === editData.lppId);
-      if (l) setLppSelection([{ id: l.id, label: l.name }]);
-    }
-  }, [editData, lpps]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -111,7 +85,6 @@ export default function CycleForm({ isOpen, onClose, onSuccess, editData }: Cycl
 
     setIsLoading(true);
     try {
-      const status = (statusSelection[0]?.id ?? 'Planned') as CycleStatus;
       const url = editData ? `/api/cycles/${editData.id}` : '/api/cycles';
       const method = editData ? 'PUT' : 'POST';
       const res = await fetch(url, {
@@ -124,7 +97,7 @@ export default function CycleForm({ isOpen, onClose, onSuccess, editData }: Cycl
           cycleNumber: parseInt(cycleNumber),
           startDate,
           endDate,
-          status,
+          status: status as CycleStatus,
         }),
       });
 
@@ -145,118 +118,117 @@ export default function CycleForm({ isOpen, onClose, onSuccess, editData }: Cycl
     }
   };
 
-  const ptatOptions = ptats.map((p) => ({ id: p.id, label: p.name }));
-  const lppOptions = lpps.map((l) => ({ id: l.id, label: l.name }));
+  if (!isOpen) return null;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      heading={editData ? 'Edit Cycle' : 'New Cycle'}
-      onRequestClose={onClose}
-      size="medium"
-      footer={[
-        <Button key="cancel" label="Cancel" onClick={onClose} disabled={isLoading} />,
-        <Button
-          key="save"
-          label={isLoading ? 'Saving...' : 'Save'}
-          variant="brand"
-          onClick={handleSubmit}
-          disabled={isLoading}
-        />,
-      ]}
-    >
-      <div className="slds-p-around_medium slds-grid slds-wrap slds-gutters">
-        <div className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-          <Combobox
-            id="cycle-ptat"
-            labels={{ label: 'PTAT', placeholder: 'Select PTAT...' }}
-            options={ptatOptions}
-            selection={ptatSelection}
-            value=""
-            events={{
-              onSelect: (_e: any, { selection }: any) => {
-                setPtatSelection(selection);
-                setPtatId(selection[0]?.id ?? '');
-                setLppId('');
-                setLppSelection([]);
-              },
-            }}
-            variant="readonly"
-            errorText={errors.ptatId}
-          />
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <div className="modal-header">
+          <h2>{editData ? 'Edit Cycle' : 'New Cycle'}</h2>
         </div>
-        <div className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-          <Combobox
-            id="cycle-lpp"
-            labels={{ label: 'Learning Program', placeholder: 'Select LPP...' }}
-            options={lppOptions}
-            selection={lppSelection}
-            value=""
-            events={{
-              onSelect: (_e: any, { selection }: any) => {
-                setLppSelection(selection);
-                setLppId(selection[0]?.id ?? '');
-              },
-            }}
-            variant="readonly"
-            errorText={errors.lppId}
-            disabled={!ptatId}
-          />
+        <div className="modal-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">PTAT</label>
+              <select
+                className="form-select"
+                value={ptatId}
+                onChange={(e) => {
+                  setPtatId(e.target.value);
+                  setLppId('');
+                }}
+              >
+                <option value="">Select PTAT...</option>
+                {ptats.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {errors.ptatId && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.ptatId}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Learning Program</label>
+              <select
+                className="form-select"
+                value={lppId}
+                onChange={(e) => setLppId(e.target.value)}
+                disabled={!ptatId}
+              >
+                <option value="">Select LPP...</option>
+                {lpps.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+              {errors.lppId && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.lppId}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Academic Year</label>
+              <input
+                className="form-input"
+                placeholder="e.g. 2024-25"
+                value={academicYear}
+                onChange={(e) => setAcademicYear(e.target.value)}
+              />
+              {errors.academicYear && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.academicYear}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Cycle Number</label>
+              <input
+                className="form-input"
+                type="number"
+                value={cycleNumber}
+                onChange={(e) => setCycleNumber(e.target.value)}
+              />
+              {errors.cycleNumber && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.cycleNumber}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Start Date</label>
+              <input
+                className="form-input"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+              {errors.startDate && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.startDate}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">End Date</label>
+              <input
+                className="form-input"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+              {errors.endDate && <span style={{ color: '#ba0517', fontSize: '12px' }}>{errors.endDate}</span>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Status</label>
+              <select
+                className="form-select"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
-        <div className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-          <Input
-            label="Academic Year"
-            placeholder="e.g. 2024-25"
-            value={academicYear}
-            onChange={(_e: any, data: { value: string }) => setAcademicYear(data.value)}
-            required
-            errorText={errors.academicYear}
-          />
-        </div>
-        <div className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-          <Input
-            label="Cycle Number"
-            type="number"
-            value={cycleNumber}
-            onChange={(_e: any, data: { value: string }) => setCycleNumber(data.value)}
-            required
-            errorText={errors.cycleNumber}
-          />
-        </div>
-        <div className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-          <Input
-            label="Start Date"
-            type="date"
-            value={startDate}
-            onChange={(_e: any, data: { value: string }) => setStartDate(data.value)}
-            required
-            errorText={errors.startDate}
-          />
-        </div>
-        <div className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-          <Input
-            label="End Date"
-            type="date"
-            value={endDate}
-            onChange={(_e: any, data: { value: string }) => setEndDate(data.value)}
-            required
-            errorText={errors.endDate}
-          />
-        </div>
-        <div className="slds-col slds-size_1-of-2 slds-m-bottom_medium">
-          <Combobox
-            id="cycle-status"
-            labels={{ label: 'Status' }}
-            options={STATUS_OPTIONS}
-            selection={statusSelection}
-            value=""
-            events={{
-              onSelect: (_e: any, { selection }: any) => setStatusSelection(selection),
-            }}
-            variant="readonly"
-          />
+        <div className="modal-footer">
+          <button className="btn-pill-outline" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </button>
+          <button className="btn-pill-filled" onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

@@ -1,8 +1,6 @@
 'use client';
 
 import React from 'react';
-import Input from '@salesforce/design-system-react/components/input';
-import Button from '@salesforce/design-system-react/components/button';
 import { Criterion } from '@/types';
 import { generateId } from '@/lib/utils/idGenerator';
 
@@ -91,7 +89,7 @@ export default function CustomCriteriaBuilder({ value, onChange }: CustomCriteri
             marginBottom: '12px',
           }}
         >
-          No criteria added yet. Click "Add Criterion" to get started.
+          No criteria added yet. Click &quot;Add Criterion&quot; to get started.
         </div>
       )}
 
@@ -116,12 +114,11 @@ export default function CustomCriteriaBuilder({ value, onChange }: CustomCriteri
                 Criterion Name
               </label>
             )}
-            <Input
+            <input
+              className="form-input"
               placeholder="e.g. Interview Score"
               value={criterion.name}
-              onChange={(_e: any, data: { value: string }) =>
-                updateCriterion(index, 'name', data.value)
-              }
+              onChange={(e) => updateCriterion(index, 'name', e.target.value)}
             />
           </div>
           <div>
@@ -130,13 +127,12 @@ export default function CustomCriteriaBuilder({ value, onChange }: CustomCriteri
                 Weight %
               </label>
             )}
-            <Input
+            <input
+              className="form-input"
               placeholder="0"
               type="number"
               value={String(criterion.weightage)}
-              onChange={(_e: any, data: { value: string }) =>
-                updateCriterion(index, 'weightage', parseFloat(data.value) || 0)
-              }
+              onChange={(e) => updateCriterion(index, 'weightage', parseFloat(e.target.value) || 0)}
             />
           </div>
           <div>
@@ -145,38 +141,33 @@ export default function CustomCriteriaBuilder({ value, onChange }: CustomCriteri
                 Source Field
               </label>
             )}
-            <div className="slds-form-element">
-              <div className="slds-form-element__control">
-                <select
-                  className="slds-select"
-                  value={criterion.sourceField ?? ''}
-                  onChange={(e) => updateCriterion(index, 'sourceField', e.target.value || null)}
-                  style={{ height: '32px' }}
-                >
-                  {SOURCE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <select
+              className="form-select"
+              value={criterion.sourceField ?? ''}
+              onChange={(e) => updateCriterion(index, 'sourceField', e.target.value || null)}
+            >
+              {SOURCE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
-          <div style={{ paddingBottom: index === 0 ? '0' : '0' }}>
-            <Button
-              label="Remove"
-              variant="destructive"
+          <div>
+            <button
+              className="btn-secondary"
+              style={{ color: '#ba0517', borderColor: '#ba0517' }}
               onClick={() => removeCriterion(index)}
-            />
+            >
+              Remove
+            </button>
           </div>
         </div>
       ))}
 
-      <Button
-        label="Add Criterion"
-        onClick={addCriterion}
-        variant="outline-brand"
-      />
+      <button className="btn-secondary" onClick={addCriterion}>
+        Add Criterion
+      </button>
     </div>
   );
 }

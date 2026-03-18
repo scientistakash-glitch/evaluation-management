@@ -1,12 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import DataTable from '@salesforce/design-system-react/components/data-table';
-import DataTableColumn from '@salesforce/design-system-react/components/data-table/column';
-import DataTableCell from '@salesforce/design-system-react/components/data-table/cell';
-import DataTableRowActions from '@salesforce/design-system-react/components/data-table/row-actions';
-import PageHeader from '@salesforce/design-system-react/components/page-header';
-import Button from '@salesforce/design-system-react/components/button';
 import { Cycle, PTAT, LPP } from '@/types';
 import CycleForm from './CycleForm';
 import ConfirmModal from '../common/ConfirmModal';
@@ -19,28 +13,6 @@ interface CycleListProps {
   ptats: PTAT[];
   lpps: LPP[];
 }
-
-const ROW_ACTIONS = [
-  { label: 'View', value: 'view' },
-  { label: 'Edit', value: 'edit' },
-  { label: 'Delete', value: 'delete' },
-];
-
-const AcademicYearCell = ({ item, children, ...props }: any) => (
-  <DataTableCell {...props} item={item}>
-    <Link href={`/cycles/${item?.id}`} style={{ color: '#0070d2', textDecoration: 'none' }}>
-      {children}
-    </Link>
-  </DataTableCell>
-);
-AcademicYearCell.displayName = DataTableCell.displayName;
-
-const StatusCell = ({ item, ...props }: any) => (
-  <DataTableCell {...props} item={item}>
-    <StatusBadge status={item?.status ?? ''} />
-  </DataTableCell>
-);
-StatusCell.displayName = DataTableCell.displayName;
 
 export default function CycleList({ initialCycles, ptats, lpps }: CycleListProps) {
   const { showToast } = useToast();
@@ -59,19 +31,6 @@ export default function CycleList({ initialCycles, ptats, lpps }: CycleListProps
     lppName: lppMap.get(c.lppId)?.name ?? c.lppId,
     dateRange: `${c.startDate} – ${c.endDate}`,
   }));
-
-  const handleRowAction = (item: any, action: { value: string }) => {
-    const cycle = cycles.find((c) => c.id === item.id);
-    if (!cycle) return;
-    if (action.value === 'view') {
-      window.location.href = `/cycles/${cycle.id}`;
-    } else if (action.value === 'edit') {
-      setEditData(cycle);
-      setIsFormOpen(true);
-    } else if (action.value === 'delete') {
-      setDeleteTarget(cycle);
-    }
-  };
 
   const handleSuccess = (cycle: Cycle) => {
     setCycles((prev) => {
@@ -106,35 +65,90 @@ export default function CycleList({ initialCycles, ptats, lpps }: CycleListProps
 
   return (
     <div>
-      <PageHeader
-        label="Evaluation Cycles"
-        title="Cycles"
-        variant="object-home"
-        onRenderActions={() => (
-          <Button
-            label="New Cycle"
-            variant="brand"
-            onClick={() => {
-              setEditData(null);
-              setIsFormOpen(true);
-            }}
-          />
-        )}
-      />
-      <div className="slds-card slds-m-top_medium">
-        <DataTable items={tableItems} id="cycles-table">
-          <DataTableColumn label="Academic Year" property="academicYear" primaryColumn>
-            <AcademicYearCell />
-          </DataTableColumn>
-          <DataTableColumn label="Cycle #" property="cycleNumber" />
-          <DataTableColumn label="PTAT" property="ptatName" />
-          <DataTableColumn label="Program" property="lppName" />
-          <DataTableColumn label="Date Range" property="dateRange" />
-          <DataTableColumn label="Status" property="status">
-            <StatusCell />
-          </DataTableColumn>
-          <DataTableRowActions options={ROW_ACTIONS} onAction={handleRowAction} />
-        </DataTable>
+      <div className="page-header">
+        <div>
+          <div style={{ fontSize: '12px', color: '#706e6b', marginBottom: '4px' }}>Evaluation Cycles</div>
+          <h1 className="page-title">Cycles</h1>
+        </div>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setEditData(null);
+            setIsFormOpen(true);
+          }}
+        >
+          New Cycle
+        </button>
+      </div>
+
+      <div style={{ marginTop: '16px' }}>
+        <table className="table-custom">
+          <thead>
+            <tr>
+              <th>Academic Year</th>
+              <th>Cycle #</th>
+              <th>PTAT</th>
+              <th>Program</th>
+              <th>Date Range</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableItems.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: 'center', color: '#706e6b', padding: '32px' }}>
+                  No cycles found. Create one to get started.
+                </td>
+              </tr>
+            )}
+            {tableItems.map((item) => (
+              <tr key={item.id}>
+                <td>
+                  <Link href={`/cycles/${item.id}`} style={{ color: '#0070d2', textDecoration: 'none' }}>
+                    {item.academicYear}
+                  </Link>
+                </td>
+                <td>{item.cycleNumber}</td>
+                <td>{item.ptatName}</td>
+                <td>{item.lppName}</td>
+                <td>{item.dateRange}</td>
+                <td><StatusBadge status={item.status} /></td>
+                <td>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '12px' }}
+                      onClick={() => { window.location.href = `/cycles/${item.id}`; }}
+                    >
+                      View
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '12px' }}
+                      onClick={() => {
+                        const cycle = cycles.find((c) => c.id === item.id);
+                        if (cycle) { setEditData(cycle); setIsFormOpen(true); }
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '12px', color: '#ba0517', borderColor: '#ba0517' }}
+                      onClick={() => {
+                        const cycle = cycles.find((c) => c.id === item.id);
+                        if (cycle) setDeleteTarget(cycle);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <CycleForm

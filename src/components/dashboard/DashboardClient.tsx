@@ -1,8 +1,6 @@
 'use client';
 
 import React from 'react';
-import Card from '@salesforce/design-system-react/components/card';
-import Button from '@salesforce/design-system-react/components/button';
 import { useRouter } from 'next/navigation';
 
 interface DashboardClientProps {
@@ -79,54 +77,28 @@ export default function DashboardClient({
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-        <div
-          style={{
-            background: '#fff',
-            borderRadius: '8px',
-            padding: '24px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-          }}
-        >
+        <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ fontWeight: 700, color: '#3e3e3c', marginBottom: '8px' }}>Quick Actions</h3>
           <p style={{ color: '#706e6b', fontSize: '13px', marginBottom: '16px' }}>
             Get started with common tasks
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <Button
-              label="New PTAT"
-              variant="brand"
-              onClick={() => router.push('/ptats')}
-              style={{ width: '100%' }}
-            />
-            <Button
-              label="New Cycle"
-              variant="outline-brand"
-              onClick={() => router.push('/cycles')}
-              style={{ width: '100%' }}
-            />
-            <Button
-              label="View Applications"
-              variant="neutral"
-              onClick={() => router.push('/applications')}
-              style={{ width: '100%' }}
-            />
-            <Button
-              label="Manage Criteria Sets"
-              variant="neutral"
-              onClick={() => router.push('/criteria-sets')}
-              style={{ width: '100%' }}
-            />
+            <button className="btn-primary" style={{ width: '100%' }} onClick={() => router.push('/ptats')}>
+              New PTAT
+            </button>
+            <button className="btn-secondary" style={{ width: '100%' }} onClick={() => router.push('/cycles')}>
+              New Cycle
+            </button>
+            <button className="btn-secondary" style={{ width: '100%' }} onClick={() => router.push('/applications')}>
+              View Applications
+            </button>
+            <button className="btn-secondary" style={{ width: '100%' }} onClick={() => router.push('/criteria-sets')}>
+              Manage Criteria Sets
+            </button>
           </div>
         </div>
 
-        <div
-          style={{
-            background: '#fff',
-            borderRadius: '8px',
-            padding: '24px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
-          }}
-        >
+        <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ fontWeight: 700, color: '#3e3e3c', marginBottom: '8px' }}>How It Works</h3>
           <ol style={{ color: '#706e6b', fontSize: '13px', paddingLeft: '20px', lineHeight: 2 }}>
             <li>Create <strong>PTATs</strong> (Program Types) and add <strong>LPPs</strong> (Learning Programs)</li>
