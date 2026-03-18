@@ -1,0 +1,4 @@
+[
+  {"id":"ptat_001","name":"B.Tech","code":"BTECH","description":"Bachelor of Technology programs","createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-01T00:00:00Z"},
+  {"id":"ptat_002","name":"M.Tech","code":"MTECH","description":"Master of Technology programs","createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-01T00:00:00Z"}
+]

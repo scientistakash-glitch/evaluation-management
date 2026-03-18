@@ -1,0 +1,26 @@
+[
+  {
+    "id":"cs_001",
+    "name":"Standard Engineering Criteria",
+    "description":"60% Entrance Score + 30% Academic Record + 10% Interview",
+    "isCustom":false,
+    "criteria":[
+      {"id":"crit_001","name":"Entrance Score","weightage":60,"sourceField":"entranceScore"},
+      {"id":"crit_002","name":"Past Academic Record","weightage":30,"sourceField":"academicScore"},
+      {"id":"crit_003","name":"Interview Score","weightage":10,"sourceField":null}
+    ],
+    "createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-01T00:00:00Z"
+  },
+  {
+    "id":"cs_002",
+    "name":"Research Track Criteria",
+    "description":"50% Entrance + 30% Research Aptitude + 20% Academic",
+    "isCustom":false,
+    "criteria":[
+      {"id":"crit_004","name":"Entrance Score","weightage":50,"sourceField":"entranceScore"},
+      {"id":"crit_005","name":"Research Aptitude","weightage":30,"sourceField":null},
+      {"id":"crit_006","name":"Academic Score","weightage":20,"sourceField":"academicScore"}
+    ],
+    "createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-01T00:00:00Z"
+  }
+]
