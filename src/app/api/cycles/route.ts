@@ -18,18 +18,59 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { ptatId, lppId, academicYear, cycleNumber, startDate, endDate, status } = body;
-    if (!ptatId || !lppId || !academicYear || cycleNumber == null || !startDate || !endDate || !status) {
-      return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
+    const {
+      name,
+      number,
+      academicYear,
+      hasPreviousCycle,
+      ptatId,
+      lppIds,
+      timeline,
+      evaluationStrategy,
+    } = body;
+
+    if (!name || number == null || !academicYear || !ptatId || !lppIds || !timeline) {
+      return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
     }
 
+    if (
+      !timeline.startDate ||
+      !timeline.offerReleaseDate ||
+      !timeline.acceptanceDeadline ||
+      !timeline.paymentDeadline ||
+      !timeline.closingDate
+    ) {
+      return NextResponse.json({ error: 'All timeline dates are required' }, { status: 400 });
+    }
+
+    // Check for unique cycle number
     const existing = await getAllCycles();
-    const overlapError = validateNonOverlapping({ ptatId, startDate, endDate }, existing);
+    const duplicateNumber = existing.find((c) => c.number === number);
+    if (duplicateNumber) {
+      return NextResponse.json({ error: `Cycle number ${number} already exists` }, { status: 409 });
+    }
+
+    // Overlap validation
+    const overlapError = validateNonOverlapping(
+      { ptatId, startDate: timeline.startDate, closingDate: timeline.closingDate },
+      existing
+    );
     if (overlapError) {
       return NextResponse.json({ error: overlapError }, { status: 409 });
     }
 
-    const cycle = await createCycle({ ptatId, lppId, academicYear, cycleNumber, startDate, endDate, status });
+    const cycle = await createCycle({
+      name,
+      number,
+      academicYear,
+      hasPreviousCycle: hasPreviousCycle ?? false,
+      ptatId,
+      lppIds,
+      timeline,
+      evaluationStrategy: evaluationStrategy ?? null,
+      status: 'Planned',
+    });
+
     return NextResponse.json(cycle, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Failed to create cycle' }, { status: 500 });

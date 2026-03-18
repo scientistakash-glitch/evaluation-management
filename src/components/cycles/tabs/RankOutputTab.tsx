@@ -24,8 +24,8 @@ export default function RankOutputTab({ cycle }: RankOutputTabProps) {
         fetch(`/api/rank-records?cycleId=${cycle.id}`).then((r) => r.json()),
         fetch('/api/applications').then((r) => r.json()),
       ]);
-      setRankRecords(records);
-      setApplications(apps);
+      setRankRecords(Array.isArray(records) ? records : []);
+      setApplications(Array.isArray(apps) ? apps : []);
     } catch {
       showToast('Failed to load rank records', 'error');
     } finally {
@@ -49,7 +49,6 @@ export default function RankOutputTab({ cycle }: RankOutputTabProps) {
     return (
       <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
         <div style={{ fontSize: '16px', fontWeight: 500, marginBottom: '8px' }}>No Rankings Yet</div>
-        <div style={{ fontSize: '14px' }}>Run the evaluation and generate rankings to see the rank list here.</div>
       </div>
     );
   }
@@ -64,16 +63,6 @@ export default function RankOutputTab({ cycle }: RankOutputTabProps) {
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h3 style={{ fontWeight: 600, color: 'var(--color-primary)', margin: 0, fontSize: '16px' }}>
-          Rank List ({filteredRecords.length} entries)
-        </h3>
-        <button className="btn-secondary" onClick={loadData}>
-          Refresh
-        </button>
-      </div>
-
-      {/* Category filter pills */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {CATEGORIES.map((cat) => {
           const count = cat === 'All'
@@ -101,41 +90,35 @@ export default function RankOutputTab({ cycle }: RankOutputTabProps) {
         })}
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table className="table-custom">
-          <thead>
-            <tr>
-              <th>{activeCategory === 'All' ? 'Global Rank' : 'Category Rank'}</th>
-              {activeCategory === 'All' && <th>Cat. Rank</th>}
-              <th>Name</th>
-              <th>Category</th>
-              <th>Composite Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRecords.map((record) => {
-              const app = appMap.get(record.applicationId);
-              return (
-                <tr key={record.id}>
-                  <td style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-                    #{activeCategory === 'All' ? record.globalRank : record.categoryRank}
-                  </td>
-                  {activeCategory === 'All' && (
-                    <td style={{ color: 'var(--color-text-muted)' }}>{record.categoryRank}</td>
-                  )}
-                  <td style={{ fontWeight: 500 }}>{app?.studentName ?? record.applicationId}</td>
-                  <td>
-                    <span className="badge badge-default">{record.category}</span>
-                  </td>
-                  <td style={{ fontWeight: 700, color: 'var(--color-primary-light)' }}>
-                    {record.compositeScore.toFixed(2)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <table className="table-custom">
+        <thead>
+          <tr>
+            <th>{activeCategory === 'All' ? 'Global Rank' : 'Category Rank'}</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Composite Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredRecords.map((record) => {
+            const app = appMap.get(record.applicationId);
+            return (
+              <tr key={record.id}>
+                <td style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                  #{activeCategory === 'All' ? record.globalRank : record.categoryRank}
+                </td>
+                <td style={{ fontWeight: 500 }}>{app?.studentName ?? record.applicationId}</td>
+                <td>
+                  <span className="badge badge-default">{record.category}</span>
+                </td>
+                <td style={{ fontWeight: 700, color: 'var(--color-primary-light)' }}>
+                  {record.compositeScore.toFixed(2)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

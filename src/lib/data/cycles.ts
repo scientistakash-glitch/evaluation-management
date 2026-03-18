@@ -16,6 +16,10 @@ export async function getCycleById(id: string): Promise<Cycle | null> {
   return all.find((c) => c.id === id) ?? null;
 }
 
+export async function getByPtatId(ptatId: string): Promise<Cycle[]> {
+  return getAllCycles({ ptatId });
+}
+
 export async function createCycle(data: Omit<Cycle, 'id' | 'createdAt' | 'updatedAt'>): Promise<Cycle> {
   const all = await getAllCycles();
   const now = new Date().toISOString();

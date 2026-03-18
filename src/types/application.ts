@@ -8,6 +8,7 @@ export interface Application {
   category: ApplicationCategory;
   entranceScore: number;
   academicScore: number;
+  interviewScore: number;
   applicationDate: string;
   createdAt: string;
   updatedAt: string;

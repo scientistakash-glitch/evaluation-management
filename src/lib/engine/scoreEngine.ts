@@ -1,98 +1,69 @@
 import { getEvaluationById, updateEvaluation } from '../data/evaluations';
 import { getAllApplications } from '../data/applications';
-import { getCriteriaSetById } from '../data/criteriaSets';
 import {
-  createEvaluationScoresBatch,
-  deleteEvaluationScoresByEvaluationId,
+  createBatch,
+  deleteByEvaluationAndProgram,
 } from '../data/evaluationScores';
-import { validateWeightageSum } from '../utils/validators';
-import { Criterion, CriterionScore, EvaluationScore } from '@/types';
+import { EvaluationScore, ProgramConfig } from '@/types';
 
-export async function runEvaluation(evaluationId: string): Promise<void> {
+export async function generateCompositeScores(
+  evaluationId: string,
+  programId: string   // 'all' or specific lppId
+): Promise<void> {
   const evaluation = await getEvaluationById(evaluationId);
   if (!evaluation) throw new Error(`Evaluation ${evaluationId} not found`);
 
-  // Get criteria
-  let criteria: Criterion[] = [];
-  if (evaluation.customCriteria && evaluation.customCriteria.length > 0) {
-    criteria = evaluation.customCriteria;
-  } else if (evaluation.criteriaSetId) {
-    const cs = await getCriteriaSetById(evaluation.criteriaSetId);
-    if (!cs) throw new Error(`CriteriaSet ${evaluation.criteriaSetId} not found`);
-    criteria = cs.criteria;
-  } else {
-    throw new Error('No criteria defined for this evaluation');
-  }
+  // Find programConfig for this programId
+  const programConfig: ProgramConfig | undefined = evaluation.programConfigs.find(
+    (pc) => pc.programId === programId
+  );
+  if (!programConfig) throw new Error(`ProgramConfig for programId ${programId} not found`);
 
-  // Validate weightages sum to 100
-  const weightageError = validateWeightageSum(criteria);
-  if (weightageError) throw new Error(weightageError);
+  const { weights } = programConfig;
+
+  // Validate sum = 100
+  const sum = weights.entrance + weights.academic + weights.interview;
+  if (Math.abs(sum - 100) > 0.01) {
+    throw new Error(`Weights must sum to 100, got ${sum}`);
+  }
 
   const applications = await getAllApplications();
 
-  // Min-max normalize per criterion
-  const normalizedMap: Record<string, Record<string, number>> = {};
+  // Build score records
+  const scoreRecords: Omit<EvaluationScore, 'id' | 'createdAt' | 'updatedAt'>[] = applications.map((app) => {
+    // Normalize entrance to 0-100 scale (max 300)
+    const normalizedEntrance = (app.entranceScore / 300) * 100;
 
-  for (const criterion of criteria) {
-    if (!criterion.sourceField) continue;
-    const field = criterion.sourceField as 'entranceScore' | 'academicScore';
-    const rawValues = applications.map((a) => a[field] as number);
-    const minVal = Math.min(...rawValues);
-    const maxVal = Math.max(...rawValues);
-    const range = maxVal - minVal;
+    const compositeScore =
+      normalizedEntrance * (weights.entrance / 100) +
+      app.academicScore * (weights.academic / 100) +
+      app.interviewScore * (weights.interview / 100);
 
-    normalizedMap[criterion.id] = {};
-    for (const app of applications) {
-      const raw = app[field] as number;
-      const normalized = range === 0 ? 100 : ((raw - minVal) / range) * 100;
-      normalizedMap[criterion.id][app.id] = normalized;
-    }
-  }
-
-  // Compute composite scores
-  const scoreRecords: Omit<EvaluationScore, 'id' | 'createdAt' | 'updatedAt'>[] = [];
-
-  for (const app of applications) {
-    const criterionScores: CriterionScore[] = [];
-    let compositeScore = 0;
-
-    for (const criterion of criteria) {
-      let rawScore = 0;
-      let normalizedScore = 0;
-
-      if (criterion.sourceField) {
-        const field = criterion.sourceField as 'entranceScore' | 'academicScore';
-        rawScore = app[field] as number;
-        normalizedScore = normalizedMap[criterion.id]?.[app.id] ?? 0;
-      }
-
-      const weightedContribution = (normalizedScore * criterion.weightage) / 100;
-      compositeScore += weightedContribution;
-
-      criterionScores.push({
-        criterionId: criterion.id,
-        criterionName: criterion.name,
-        rawScore,
-        normalizedScore,
-        weightedContribution,
-      });
-    }
-
-    scoreRecords.push({
+    return {
       evaluationId,
       applicationId: app.id,
-      criterionScores,
-      compositeScore,
-    });
-  }
+      programId,
+      entranceScore: app.entranceScore,
+      academicScore: app.academicScore,
+      interviewScore: app.interviewScore,
+      compositeScore: Math.round(compositeScore * 100) / 100,
+    };
+  });
 
-  // Delete existing scores and write new ones
-  await deleteEvaluationScoresByEvaluationId(evaluationId);
-  await createEvaluationScoresBatch(scoreRecords);
+  // Delete existing scores for this evaluation + programId
+  await deleteByEvaluationAndProgram(evaluationId, programId);
 
-  // Update evaluation status
+  // Write new scores
+  await createBatch(scoreRecords);
+
+  // Mark programConfig.scoresGenerated = true
+  const updatedConfigs = evaluation.programConfigs.map((pc) =>
+    pc.programId === programId ? { ...pc, scoresGenerated: true } : pc
+  );
+
+  // Update evaluation
   await updateEvaluation(evaluationId, {
+    programConfigs: updatedConfigs,
     status: 'Scored',
-    scoredAt: new Date().toISOString(),
   });
 }

@@ -3,11 +3,13 @@ export interface RankRecord {
   evaluationId: string;
   cycleId: string;
   applicationId: string;
+  programId: string;         // 'all' or lppId
   compositeScore: number;
   globalRank: number;
   categoryRank: number;
   category: string;
-  tiebreakerValues: Record<string, number>;
+  tieBreakerValue: number;   // the actual score used for tiebreaking
+  tieBreakerType: string;    // 'entrance' | 'academic' | '-'
   createdAt: string;
   updatedAt: string;
 }

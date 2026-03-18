@@ -18,10 +18,17 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const existing = await getCycleById(params.id);
     if (!existing) return NextResponse.json({ error: 'Cycle not found' }, { status: 404 });
 
-    const updatedData = { ...existing, ...body };
+    // If timeline is being updated, validate overlap
+    const updatedTimeline = body.timeline ?? existing.timeline;
+    const updatedPtatId = body.ptatId ?? existing.ptatId;
+
     const allCycles = await getAllCycles();
     const overlapError = validateNonOverlapping(
-      { ptatId: updatedData.ptatId, startDate: updatedData.startDate, endDate: updatedData.endDate },
+      {
+        ptatId: updatedPtatId,
+        startDate: updatedTimeline.startDate,
+        closingDate: updatedTimeline.closingDate,
+      },
       allCycles,
       params.id
     );

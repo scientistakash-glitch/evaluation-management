@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
-  { label: 'Evaluation Matrix', href: '/' },
+  { label: 'Cycles', href: '/' },
   { label: 'PTATs', href: '/ptats' },
   { label: 'Applications', href: '/applications' },
   { label: 'Criteria Sets', href: '/criteria-sets' },
@@ -16,11 +16,11 @@ export default function AppNavigation() {
 
   return (
     <nav className="app-nav">
-      <span className="nav-brand">Evaluation Management</span>
+      <span className="nav-brand">Admissions Workflow</span>
       {navItems.map((item) => {
         const isActive =
           item.href === '/'
-            ? pathname === '/'
+            ? pathname === '/' || pathname.startsWith('/cycle') || pathname.startsWith('/create-cycle')
             : pathname.startsWith(item.href);
         return (
           <Link

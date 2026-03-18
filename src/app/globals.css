@@ -293,3 +293,266 @@ body { background: var(--color-bg); font-family: -apple-system, BlinkMacSystemFo
 .badge-warning { background: #FEF9C3; color: #854D0E; }
 .badge-default { background: #F3F4F6; color: #374151; }
 .badge-brand { background: #EFF6FF; color: #1D4ED8; }
+.badge-gray { background: #E5E7EB; color: #6B7280; }
+.badge-maroon { background: #F5EAEA; color: #5C1010; }
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 10px;
+}
+.toggle-switch input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-track {
+  width: 44px;
+  height: 24px;
+  background: #D0C8C8;
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle-switch input:checked + .toggle-track {
+  background: var(--color-primary);
+}
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  transition: left 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-switch input:checked ~ .toggle-track .toggle-thumb,
+.toggle-switch input:checked + .toggle-track .toggle-thumb {
+  left: 23px;
+}
+
+/* Cycle Cards Grid */
+.cycles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+.cycle-card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 24px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.cycle-card:hover {
+  box-shadow: 0 4px 16px rgba(92, 16, 16, 0.12);
+  border-color: var(--color-primary-light);
+}
+
+/* Wizard styles */
+.wizard-container {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 0;
+}
+.wizard-card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-top: 0;
+}
+.wizard-body {
+  padding: 32px;
+}
+.wizard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 32px;
+  border-top: 1px solid var(--color-border);
+  background: #FAFAFA;
+}
+
+/* Radio Card */
+.radio-card {
+  border: 2px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.radio-card.selected {
+  border-color: var(--color-primary);
+  background: #FDF8F8;
+}
+.radio-card input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--color-primary);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* PTAT card */
+.ptat-card {
+  border: 2px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.ptat-card.selected {
+  border-color: var(--color-primary);
+  background: #FDF8F8;
+}
+.ptat-card:hover {
+  border-color: var(--color-primary-light);
+}
+
+/* Inline form error */
+.field-error { color: #C41010; font-size: 12px; margin-top: 4px; }
+
+/* Weight input row */
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.weight-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  width: 120px;
+  flex-shrink: 0;
+}
+.weight-input {
+  width: 90px;
+  border: 1.5px solid #D0C8C8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  text-align: center;
+}
+.weight-input:focus { border-color: var(--color-primary-light); }
+
+/* Score/Rank table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-header-text);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: #FAFAFA;
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 12px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #F5F0F0;
+  color: var(--color-text);
+  vertical-align: middle;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: #FDFAFA; }
+
+/* Category badges */
+.cat-general { background: #DBEAFE; color: #1E40AF; }
+.cat-obc { background: #D1FAE5; color: #065F46; }
+.cat-sc { background: #FEF3C7; color: #92400E; }
+.cat-st { background: #EDE9FE; color: #5B21B6; }
+.cat-ews { background: #FCE7F3; color: #9D174D; }
+
+/* Spinner */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid #e5e7eb;
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Summary info card */
+.info-card {
+  background: #F9FAFB;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 20px 24px;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label { color: var(--color-text-muted); font-weight: 500; }
+.info-value { font-weight: 600; color: var(--color-text); }
+
+/* Success banner */
+.success-banner {
+  background: #DCFCE7;
+  border: 1px solid #86EFAC;
+  border-radius: 10px;
+  padding: 16px 20px;
+  color: #166534;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Program tabs */
+.program-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 24px;
+  background: #FAFAFA;
+  overflow-x: auto;
+}
+.program-tab {
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+.program-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
+}
+.program-tab:hover { color: var(--color-primary); }
