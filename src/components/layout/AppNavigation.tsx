@@ -6,9 +6,6 @@ import { usePathname } from 'next/navigation';
 
 const navItems = [
   { label: 'Cycles', href: '/' },
-  { label: 'PTATs', href: '/ptats' },
-  { label: 'Applications', href: '/applications' },
-  { label: 'Criteria Sets', href: '/criteria-sets' },
 ];
 
 export default function AppNavigation() {

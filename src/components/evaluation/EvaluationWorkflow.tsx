@@ -1030,7 +1030,7 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
           disabled={approving}
           style={{ width: '100%', padding: '14px', fontSize: '16px', borderRadius: '10px' }}
         >
-          {approving ? 'Approving...' : 'Approve Cycle Evaluation'}
+          {approving ? 'Sending for Approval...' : 'Send for Approval'}
         </button>
       </div>
     );
