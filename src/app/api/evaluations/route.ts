@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllEvaluations, createEvaluation } from '@/lib/data/evaluations';
-import { EvaluationStrategy, TieBreakerType } from '@/types';
+import type { EvaluationStrategy } from '@/types';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,12 +16,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      cycleId,
-      strategy,
-      programConfigs,
-      tieBreaker,
-    } = body;
+    const { cycleId, strategy, programConfigs, tiebreakerRules } = body;
 
     if (!cycleId) {
       return NextResponse.json({ error: 'cycleId is required' }, { status: 400 });
@@ -31,7 +26,7 @@ export async function POST(request: NextRequest) {
       cycleId,
       strategy: (strategy as EvaluationStrategy) ?? null,
       programConfigs: programConfigs ?? [],
-      tieBreaker: (tieBreaker as TieBreakerType) ?? null,
+      tiebreakerRules: tiebreakerRules ?? [],
       ranksGenerated: false,
       status: 'Draft',
     });

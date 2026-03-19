@@ -7,7 +7,6 @@ export type {
   Evaluation,
   EvaluationStatus,
   EvaluationStrategy,
-  TieBreakerType,
   ProgramWeights,
   ProgramConfig,
 } from './evaluation';
