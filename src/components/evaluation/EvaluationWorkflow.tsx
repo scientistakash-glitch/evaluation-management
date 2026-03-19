@@ -62,25 +62,30 @@ function formatDate(d: string) {
   return `${day}/${m}/${y}`;
 }
 
+function tbString(r: RankRecord, tiebreakerRules: TiebreakerRule[]): string {
+  if (!r.tieBreakerApplied) return '';
+  return tiebreakerRules
+    .filter((rule) => r.tieBreakerValues[rule.criterionId] !== undefined)
+    .map((rule) => `${rule.criterionName} ${(r.tieBreakerValues[rule.criterionId] ?? 0).toFixed(1)}`)
+    .join(' › ');
+}
+
 function downloadCSV(rows: RankRecord[], appMap: Map<string, Application>, lppMap: Map<string, string>, tiebreakerRules: TiebreakerRule[]) {
-  const tbHeaders = tiebreakerRules.map((r) => r.criterionName);
-  const header = ['Global Rank', 'Program Rank', 'Category Rank', 'Student Name', 'Roll No', 'Category', 'Program', 'Composite Score', ...tbHeaders, 'Tiebreaker Applied'];
+  const header = ['Global Rank', 'Global TB', 'Program Rank', 'Program TB', 'Category Rank', 'Category TB', 'Student Name', 'Roll No', 'Category', 'Program', 'Composite Score'];
   const lines = [header.join(',')];
   for (const r of rows) {
     const app = appMap.get(r.applicationId);
     const programName = r.programId === 'all' ? 'All Programs' : (lppMap.get(r.programId) ?? r.programId);
-    const tbValues = tiebreakerRules.map((rule) =>
-      r.tieBreakerApplied ? (r.tieBreakerValues[rule.criterionId] ?? '').toString() : ''
-    );
+    const tb = tbString(r, tiebreakerRules);
     lines.push([
-      r.globalRank, r.programRank, r.categoryRank,
+      r.globalRank, `"${tb}"`,
+      r.programRank, `"${tb}"`,
+      r.categoryRank, `"${tb}"`,
       `"${app?.studentName ?? r.applicationId}"`,
       app?.rollNumber ?? '',
       r.category,
       `"${programName}"`,
       r.compositeScore,
-      ...tbValues,
-      r.tieBreakerApplied ? 'Yes' : 'No',
     ].join(','));
   }
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -510,39 +515,39 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
                 <th>Category</th>
                 {programs.length > 1 && <th>Program</th>}
                 <th>Composite Score</th>
-                {tiebreakerRules.length > 0 && <th>Tiebreaker</th>}
               </tr>
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
+                <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
               ) : pageRows.map((r) => {
                 const app = appMap.get(r.applicationId);
                 const programName = r.programId === 'all' ? 'All Programs' : (lppMap.get(r.programId) ?? r.programId);
+                const tb = tbString(r, tiebreakerRules);
+                const tbBadge = tb ? (
+                  <div style={{ fontSize: '10px', color: '#b45309', marginTop: '3px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 5px', display: 'inline-block' }}>
+                    TB: {tb}
+                  </div>
+                ) : null;
                 return (
                   <tr key={r.id}>
-                    <td><strong style={{ color: 'var(--color-primary)' }}>#{r.globalRank}</strong></td>
-                    <td>{r.programRank}</td>
-                    <td>{r.categoryRank}</td>
+                    <td>
+                      <strong style={{ color: 'var(--color-primary)' }}>#{r.globalRank}</strong>
+                      {tbBadge}
+                    </td>
+                    <td>
+                      <strong>#{r.programRank}</strong>
+                      {tbBadge}
+                    </td>
+                    <td>
+                      <strong>#{r.categoryRank}</strong>
+                      {tbBadge}
+                    </td>
                     <td style={{ fontWeight: 600 }}>{app?.studentName ?? r.applicationId}</td>
                     <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{app?.rollNumber ?? '—'}</td>
                     <td><CategoryBadge category={r.category} /></td>
                     {programs.length > 1 && <td style={{ fontSize: '12px' }}>{programName}</td>}
                     <td><strong>{r.compositeScore.toFixed(2)}</strong></td>
-                    {tiebreakerRules.length > 0 && (
-                      <td style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {r.tieBreakerApplied ? (
-                          <span style={{ color: '#b45309' }}>
-                            {tiebreakerRules.filter((rule) => r.tieBreakerValues[rule.criterionId] !== undefined).map((rule, i) => (
-                              <span key={i}>
-                                {i > 0 && ', '}
-                                {rule.criterionName}: {(r.tieBreakerValues[rule.criterionId] ?? 0).toFixed(1)}
-                              </span>
-                            ))}
-                          </span>
-                        ) : '—'}
-                      </td>
-                    )}
                   </tr>
                 );
               })}

@@ -268,36 +268,48 @@ export default function CreateCyclePage() {
     );
   }
 
+  function getOfferFigures(baseSeats: number, cn: number | null) {
+    if (!cn || cn <= 1) return { released: 0, accepted: 0, withdrawn: 0, pending: 0 };
+    const released  = Math.round(baseSeats * 0.85);
+    const accepted  = Math.round(released * 0.70);
+    const withdrawn = Math.round(released * 0.05);
+    const pending   = released - accepted - withdrawn;
+    return { released, accepted, withdrawn, pending };
+  }
+
   function renderStep2() {
-    // Seat matrix: rows = LPPs, cols = Categories
+    const isFirstCycle = cycleNumber === 1;
     return (
       <div className="wizard-step">
         <h2 className="step-title">Seat Matrix</h2>
         <p className="step-subtitle">
-          Review the seat allocation and application count per program and category before proceeding.
+          Review seat allocation and offer status per program and category.
+          {isFirstCycle
+            ? ' Cycle 1 — no prior offers exist.'
+            : ` Cycle ${cycleNumber} — offer figures are carried from the previous cycle.`}
         </p>
 
         <div style={{ overflowX: 'auto', marginTop: '8px' }}>
-          <table className="data-table" style={{ minWidth: '720px', fontSize: '13px' }}>
+          <table className="data-table" style={{ minWidth: '1100px', fontSize: '12px' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left' }}>Program</th>
+                <th style={{ textAlign: 'left' }} rowSpan={2}>Program</th>
                 {CATEGORIES.map((cat) => (
-                  <th key={cat} style={{ textAlign: 'center' }} colSpan={2}>{cat}</th>
+                  <th key={cat} style={{ textAlign: 'center', borderLeft: '2px solid var(--color-border)' }} colSpan={5}>{cat}</th>
                 ))}
-                <th style={{ textAlign: 'center' }}>Total Seats</th>
-                <th style={{ textAlign: 'center' }}>Total Applications</th>
+                <th style={{ textAlign: 'center' }} rowSpan={2}>Total Seats</th>
+                <th style={{ textAlign: 'center' }} rowSpan={2}>Total Apps</th>
               </tr>
               <tr style={{ background: '#f9fafb' }}>
-                <th></th>
                 {CATEGORIES.map((cat) => (
                   <React.Fragment key={cat}>
-                    <th style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>Seats</th>
-                    <th style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 500 }}>Applied</th>
+                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)', borderLeft: '2px solid var(--color-border)', whiteSpace: 'nowrap' }}>Seats</th>
+                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>Released</th>
+                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#276749', whiteSpace: 'nowrap' }}>Accepted</th>
+                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#92400e', whiteSpace: 'nowrap' }}>Withdrawn</th>
+                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#1d4ed8', whiteSpace: 'nowrap' }}>Pending</th>
                   </React.Fragment>
                 ))}
-                <th></th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -308,16 +320,14 @@ export default function CreateCyclePage() {
                     <td style={{ fontWeight: 600 }}>{lpp.name}</td>
                     {CATEGORIES.map((cat) => {
                       const seats = lpp.categoryWiseSeats?.[cat] ?? 0;
-                      const applied = lppApps.filter((a) => a.category === cat).length;
-                      const oversubscribed = applied > seats;
+                      const { released, accepted, withdrawn, pending } = getOfferFigures(seats, cycleNumber);
                       return (
                         <React.Fragment key={cat}>
-                          <td style={{ textAlign: 'center' }}>{seats}</td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span style={{ fontWeight: 600, color: oversubscribed ? '#c53030' : '#276749' }}>
-                              {applied}
-                            </span>
-                          </td>
+                          <td style={{ textAlign: 'center', borderLeft: '2px solid var(--color-border)' }}>{seats}</td>
+                          <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{released}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: '#276749' }}>{accepted}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: '#92400e' }}>{withdrawn}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: '#1d4ed8' }}>{pending}</td>
                         </React.Fragment>
                       );
                     })}
@@ -330,12 +340,18 @@ export default function CreateCyclePage() {
               <tr style={{ borderTop: '2px solid var(--color-border)', background: 'var(--color-primary-bg)' }}>
                 <td style={{ fontWeight: 700, fontSize: '13px' }}>Total</td>
                 {CATEGORIES.map((cat) => {
-                  const totalSeats = ptatLpps.reduce((s, l) => s + (l.categoryWiseSeats?.[cat] ?? 0), 0);
-                  const totalApplied = allApplications.filter((a) => ptatLpps.some((l) => l.id === a.lppPreference) && a.category === cat).length;
+                  const totalSeats    = ptatLpps.reduce((s, l) => s + (l.categoryWiseSeats?.[cat] ?? 0), 0);
+                  const totFigures    = ptatLpps.reduce((acc, l) => {
+                    const f = getOfferFigures(l.categoryWiseSeats?.[cat] ?? 0, cycleNumber);
+                    return { released: acc.released + f.released, accepted: acc.accepted + f.accepted, withdrawn: acc.withdrawn + f.withdrawn, pending: acc.pending + f.pending };
+                  }, { released: 0, accepted: 0, withdrawn: 0, pending: 0 });
                   return (
                     <React.Fragment key={cat}>
-                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{totalSeats}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{totalApplied}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, borderLeft: '2px solid var(--color-border)' }}>{totalSeats}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{totFigures.released}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#276749' }}>{totFigures.accepted}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#92400e' }}>{totFigures.withdrawn}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#1d4ed8' }}>{totFigures.pending}</td>
                     </React.Fragment>
                   );
                 })}
@@ -347,9 +363,11 @@ export default function CreateCyclePage() {
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', gap: '16px' }}>
-          <span><span style={{ color: '#c53030', fontWeight: 600 }}>Red</span> = oversubscribed (applications exceed seats)</span>
-          <span><span style={{ color: '#276749', fontWeight: 600 }}>Green</span> = within capacity</span>
+        <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+          <span><span style={{ color: '#276749', fontWeight: 600 }}>Accepted</span> = offers accepted by applicants</span>
+          <span><span style={{ color: '#92400e', fontWeight: 600 }}>Withdrawn</span> = offers declined / withdrawn</span>
+          <span><span style={{ color: '#1d4ed8', fontWeight: 600 }}>Pending</span> = released but awaiting response</span>
+          {isFirstCycle && <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Offer columns show 0 for Cycle 1</span>}
         </div>
       </div>
     );
