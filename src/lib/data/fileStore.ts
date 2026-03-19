@@ -1,13 +1,8 @@
-import fs from 'fs/promises';
-import path from 'path';
-
-// Use Upstash Redis when env vars are present
-const isVercel = !!process.env.UPSTASH_REDIS_REST_URL;
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const SEED: Record<string, any[]> = {
+const SEED_READONLY: Record<string, any[]> = {
   'ptats.json': [
     { id: 'ptat_001', name: 'B.Tech', code: 'BTECH', description: 'Bachelor of Technology programs', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
     { id: 'ptat_002', name: 'M.Tech', code: 'MTECH', description: 'Master of Technology programs', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
@@ -52,8 +47,21 @@ const SEED: Record<string, any[]> = {
   ],
   'criteria-sets.json': [
     { id: 'cs_001', name: 'Standard Engineering Criteria', description: '60% Entrance + 30% Academic + 10% Interview', isCustom: false, criteria: [{ id: 'crit_001', name: 'Entrance Score', weightage: 60, sourceField: 'entranceScore' }, { id: 'crit_002', name: 'Past Academic Record', weightage: 30, sourceField: 'academicScore' }, { id: 'crit_003', name: 'Interview Score', weightage: 10, sourceField: null }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-    { id: 'cs_002', name: 'Research Track Criteria', description: '50% Entrance + 30% Research Aptitude + 20% Academic', isCustom: false, criteria: [{ id: 'crit_004', name: 'Entrance Score', weightage: 50, sourceField: 'entranceScore' }, { id: 'crit_005', name: 'Research Aptitude', weightage: 30, sourceField: null }, { id: 'crit_006', name: 'Academic Score', weightage: 20, sourceField: 'academicScore' }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
   ],
+};
+
+const WRITABLE_KEYS = [
+  'cycles.json',
+  'evaluations.json',
+  'evaluation-scores.json',
+  'tiebreaker-configs.json',
+  'rank-records.json',
+];
+
+// ── In-memory store ────────────────────────────────────────────────────────────
+
+const store: Record<string, any[]> = {
+  ...SEED_READONLY,
   'cycles.json':             [],
   'evaluations.json':        [],
   'evaluation-scores.json':  [],
@@ -61,54 +69,18 @@ const SEED: Record<string, any[]> = {
   'rank-records.json':       [],
 };
 
-// ── Upstash Redis ─────────────────────────────────────────────────────────────
-
-async function getRedis() {
-  const { Redis } = await import('@upstash/redis');
-  return new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-  });
-}
-
-async function kvRead<T>(filename: string): Promise<T[]> {
-  const redis = await getRedis();
-  const data = await redis.get<T[]>(filename);
-  if (data !== null && data !== undefined) return data as T[];
-  // First access — seed the key with initial data
-  const seed = (SEED[filename] ?? []) as T[];
-  await redis.set(filename, seed);
-  return seed;
-}
-
-async function kvWrite<T>(filename: string, data: T[]): Promise<void> {
-  const redis = await getRedis();
-  await redis.set(filename, data);
-}
-
-// ── Local file I/O (dev) ──────────────────────────────────────────────────────
-
-const seedDir = path.join(process.cwd(), 'data');
-
-async function localRead<T>(filename: string): Promise<T[]> {
-  try {
-    const content = await fs.readFile(path.join(seedDir, filename), 'utf-8');
-    return JSON.parse(content) as T[];
-  } catch {
-    return (SEED[filename] ?? []) as T[];
+export function resetStore(): void {
+  for (const key of WRITABLE_KEYS) {
+    store[key] = [];
   }
-}
-
-async function localWrite<T>(filename: string, data: T[]): Promise<void> {
-  await fs.writeFile(path.join(seedDir, filename), JSON.stringify(data, null, 2), 'utf-8');
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function readJson<T>(filename: string): Promise<T[]> {
-  return isVercel ? kvRead<T>(filename) : localRead<T>(filename);
+  return (store[filename] ?? []) as T[];
 }
 
 export async function writeJson<T>(filename: string, data: T[]): Promise<void> {
-  return isVercel ? kvWrite<T>(filename, data) : localWrite<T>(filename, data);
+  store[filename] = data;
 }
