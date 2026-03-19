@@ -1,1 +1,48 @@
-[]
+[
+  {
+    "id": "eval_899yLGb0",
+    "cycleId": "cycle__5sooQLg",
+    "strategy": "single",
+    "programConfigs": [
+      {
+        "programId": "all",
+        "programName": "All Programs",
+        "weights": {
+          "entrance": 10,
+          "academic": 20,
+          "interview": 70
+        },
+        "scoresGenerated": true
+      }
+    ],
+    "tieBreaker": "entrance",
+    "ranksGenerated": true,
+    "status": "Approved",
+    "createdAt": "2026-03-19T05:22:03.658Z",
+    "updatedAt": "2026-03-19T05:22:43.776Z",
+    "approvedAt": "2026-03-19T05:22:43.776Z"
+  },
+  {
+    "id": "eval_Kp5XKH7A",
+    "cycleId": "cycle_VNrBCKPE",
+    "strategy": "program-wise",
+    "programConfigs": [
+      {
+        "programId": "lpp_004",
+        "programName": "M.Tech AI",
+        "weights": {
+          "entrance": 12,
+          "academic": 12,
+          "interview": 76
+        },
+        "scoresGenerated": true
+      }
+    ],
+    "tieBreaker": "entrance",
+    "ranksGenerated": true,
+    "status": "Approved",
+    "createdAt": "2026-03-19T05:24:06.035Z",
+    "updatedAt": "2026-03-19T05:25:08.234Z",
+    "approvedAt": "2026-03-19T05:25:08.233Z"
+  }
+]

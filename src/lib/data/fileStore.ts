@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-// Use KV when the Vercel KV env var is present
-const isVercel = !!process.env.KV_REST_API_URL;
+// Use Upstash Redis when env vars are present
+const isVercel = !!process.env.UPSTASH_REDIS_REST_URL;
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
@@ -61,21 +61,30 @@ const SEED: Record<string, any[]> = {
   'rank-records.json':       [],
 };
 
-// ── Vercel KV ─────────────────────────────────────────────────────────────────
+// ── Upstash Redis ─────────────────────────────────────────────────────────────
+
+function getRedis() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Redis } = require('@upstash/redis');
+  return new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  });
+}
 
 async function kvRead<T>(filename: string): Promise<T[]> {
-  const { kv } = await import('@vercel/kv');
-  const data = await kv.get<T[]>(filename);
+  const redis = getRedis();
+  const data = await redis.get<T[]>(filename);
   if (data !== null && data !== undefined) return data as T[];
   // First access — seed the key with initial data
   const seed = (SEED[filename] ?? []) as T[];
-  await kv.set(filename, seed);
+  await redis.set(filename, seed);
   return seed;
 }
 
 async function kvWrite<T>(filename: string, data: T[]): Promise<void> {
-  const { kv } = await import('@vercel/kv');
-  await kv.set(filename, data);
+  const redis = getRedis();
+  await redis.set(filename, data);
 }
 
 // ── Local file I/O (dev) ──────────────────────────────────────────────────────

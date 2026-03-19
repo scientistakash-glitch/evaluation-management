@@ -1,1 +1,48 @@
-[]
+[
+  {
+    "id": "cycle__5sooQLg",
+    "name": "Test 1",
+    "number": 1,
+    "academicYear": "2025-2026",
+    "hasPreviousCycle": false,
+    "ptatId": "ptat_001",
+    "lppIds": [
+      "lpp_001",
+      "lpp_002",
+      "lpp_003"
+    ],
+    "timeline": {
+      "startDate": "2026-03-20",
+      "offerReleaseDate": "2026-03-21",
+      "acceptanceDeadline": "2026-03-24",
+      "paymentDeadline": "2026-03-27",
+      "closingDate": "2026-03-28"
+    },
+    "evaluationStrategy": "single",
+    "status": "Approved",
+    "createdAt": "2026-03-19T05:21:57.871Z",
+    "updatedAt": "2026-03-19T05:22:43.777Z"
+  },
+  {
+    "id": "cycle_VNrBCKPE",
+    "name": "Test 2",
+    "number": 2,
+    "academicYear": "2025-2026",
+    "hasPreviousCycle": false,
+    "ptatId": "ptat_002",
+    "lppIds": [
+      "lpp_004"
+    ],
+    "timeline": {
+      "startDate": "2026-03-20",
+      "offerReleaseDate": "2026-03-21",
+      "acceptanceDeadline": "2026-03-22",
+      "paymentDeadline": "2026-03-24",
+      "closingDate": "2026-03-26"
+    },
+    "evaluationStrategy": "single",
+    "status": "Approved",
+    "createdAt": "2026-03-19T05:24:02.666Z",
+    "updatedAt": "2026-03-19T05:25:08.234Z"
+  }
+]
