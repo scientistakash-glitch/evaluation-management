@@ -63,9 +63,8 @@ const SEED: Record<string, any[]> = {
 
 // ── Upstash Redis ─────────────────────────────────────────────────────────────
 
-function getRedis() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Redis } = require('@upstash/redis');
+async function getRedis() {
+  const { Redis } = await import('@upstash/redis');
   return new Redis({
     url: process.env.UPSTASH_REDIS_REST_URL!,
     token: process.env.UPSTASH_REDIS_REST_TOKEN!,
@@ -73,7 +72,7 @@ function getRedis() {
 }
 
 async function kvRead<T>(filename: string): Promise<T[]> {
-  const redis = getRedis();
+  const redis = await getRedis();
   const data = await redis.get<T[]>(filename);
   if (data !== null && data !== undefined) return data as T[];
   // First access — seed the key with initial data
@@ -83,7 +82,7 @@ async function kvRead<T>(filename: string): Promise<T[]> {
 }
 
 async function kvWrite<T>(filename: string, data: T[]): Promise<void> {
-  const redis = getRedis();
+  const redis = await getRedis();
   await redis.set(filename, data);
 }
 
