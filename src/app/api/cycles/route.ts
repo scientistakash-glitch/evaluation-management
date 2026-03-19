@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
       status: 'Planned',
     });
 
-    // Create the Evaluation record inline so the detail page always has one
-    await createEvaluation({
+    // Create the Evaluation record inline so the client always has one
+    const evaluation = await createEvaluation({
       cycleId: cycle.id,
       strategy: evaluationStrategy ?? null,
       programConfigs: programConfigs ?? [],
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       status: 'Draft',
     });
 
-    return NextResponse.json(cycle, { status: 201 });
+    return NextResponse.json({ cycle, evaluation }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Failed to create cycle' }, { status: 500 });
   }

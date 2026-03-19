@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateRankings } from '@/lib/engine/rankEngine';
+import { computeRankings } from '@/lib/engine/rankEngine';
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
-    const { programId } = body;
+    const { programId, cycleId, tiebreakerRules, evaluationScores, applications } = body;
 
-    if (!programId) {
-      return NextResponse.json({ error: 'programId is required' }, { status: 400 });
+    if (!programId || !cycleId || !tiebreakerRules || !evaluationScores || !applications) {
+      return NextResponse.json(
+        { error: 'programId, cycleId, tiebreakerRules, evaluationScores, and applications are required' },
+        { status: 400 }
+      );
     }
 
-    await generateRankings(params.id, programId);
-    return NextResponse.json({ success: true });
+    const rankings = computeRankings(params.id, programId, cycleId, tiebreakerRules, evaluationScores, applications);
+    return NextResponse.json(rankings);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to generate rankings';
     return NextResponse.json({ error: message }, { status: 500 });

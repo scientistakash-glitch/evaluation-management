@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/common/ToastContext';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ const CRITERION_OPTIONS: { id: 'entrance' | 'academic' | 'interview'; label: str
 
 export default function CreateCyclePage() {
   const router = useRouter();
+  const { showToast } = useToast();
 
   // Step state
   const [step, setStep] = useState(1);
@@ -210,11 +212,17 @@ export default function CreateCyclePage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error ?? 'Failed to create cycle');
+        const errMsg = data.error ?? 'Failed to create cycle';
+        setError(errMsg);
+        showToast(errMsg, 'error');
         return;
       }
 
-      const cycle = await res.json();
+      const { cycle, evaluation } = await res.json();
+      const selectedPtatObj = ptats.find((p) => p.id === selectedPtatId) ?? null;
+      const ptatLpps = lpps.filter((l) => l.ptatId === selectedPtatId);
+      sessionStorage.setItem(`cycle-${cycle.id}`, JSON.stringify({ cycle, evaluation, ptat: selectedPtatObj, lpps: ptatLpps }));
+      showToast(`${cycle.name} created`, 'success');
       router.push(`/cycle/${cycle.id}/evaluation`);
     } finally {
       setSubmitting(false);

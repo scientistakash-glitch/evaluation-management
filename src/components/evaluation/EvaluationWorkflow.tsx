@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/common/ToastContext';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -91,106 +92,152 @@ function downloadCSV(rows: RankRecord[], appMap: Map<string, Application>, lppMa
 // ── Component ──────────────────────────────────────────────────────────────────
 
 interface Props {
-  cycle: Cycle;
-  ptat: PTAT | null;
-  lpps: LPP[];
-  initialEvaluation: Evaluation | null;
+  cycleId: string;
 }
 
-export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluation }: Props) {
+export default function EvaluationWorkflow({ cycleId }: Props) {
   const router = useRouter();
-  const [evaluation, setEvaluation] = useState<Evaluation | null>(initialEvaluation);
-  const [rankRecords, setRankRecords]   = useState<RankRecord[]>([]);
-  const [applications, setApplications] = useState<Map<string, Application>>(new Map());
-  const [generating, setGenerating]     = useState(false);
+  const { showToast } = useToast();
+
+  // Data loaded from sessionStorage
+  const [cycle, setCycle]           = useState<Cycle | null>(null);
+  const [ptat, setPtat]             = useState<PTAT | null>(null);
+  const [lpps, setLpps]             = useState<LPP[]>([]);
+  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loaded, setLoaded]         = useState(false);
+  const [loadError, setLoadError]   = useState('');
+
+  // Rankings
+  const [rankRecords, setRankRecords] = useState<RankRecord[]>([]);
+  const [generating, setGenerating]   = useState(false);
   const [generateError, setGenerateError] = useState('');
-  const [approving, setApproving]       = useState(false);
+
+  // Approval
+  const [approved, setApproved]           = useState(false);
+  const [approving, setApproving]         = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [approved, setApproved]         = useState(initialEvaluation?.status === 'Approved');
 
   // Pagination + filter
-  const [page, setPage]           = useState(1);
-  const [programFilter, setProgramFilter]   = useState('all');
+  const [page, setPage]                   = useState(1);
+  const [programFilter, setProgramFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('All');
 
-  const lppMap = new Map(lpps.map((l) => [l.id, l.name]));
-
-  // Load rank records + applications if already generated
-  const loadRankData = useCallback(async (evalId: string) => {
-    const [rankRes, appRes] = await Promise.all([
-      fetch(`/api/rank-records?evaluationId=${evalId}`).then((r) => r.json()),
-      fetch('/api/applications').then((r) => r.json()),
-    ]);
-    const records: RankRecord[] = Array.isArray(rankRes) ? rankRes : [];
-    const apps: Application[]   = Array.isArray(appRes)  ? appRes  : [];
-    setRankRecords(records);
-    setApplications(new Map(apps.map((a) => [a.id, a])));
-  }, []);
+  // ── Load from sessionStorage ───────────────────────────────────────────────
 
   useEffect(() => {
-    if (initialEvaluation?.ranksGenerated && initialEvaluation.id) {
-      loadRankData(initialEvaluation.id);
+    try {
+      const stored = sessionStorage.getItem(`cycle-${cycleId}`);
+      if (!stored) {
+        setLoadError('Cycle data not found. Please go back and create the cycle again.');
+        setLoaded(true);
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      setCycle(parsed.cycle);
+      setEvaluation(parsed.evaluation);
+      setPtat(parsed.ptat ?? null);
+      setLpps(parsed.lpps ?? []);
+      setApproved(parsed.evaluation?.status === 'Approved');
+    } catch {
+      setLoadError('Failed to load cycle data.');
+      setLoaded(true);
+      return;
     }
-  }, [initialEvaluation, loadRankData]);
 
-  // ── Generate ──────────────────────────────────────────────────────────────────
+    // Fetch applications (always available from seed)
+    fetch('/api/applications')
+      .then((r) => r.json())
+      .then((data) => setApplications(Array.isArray(data) ? data : []))
+      .catch(() => setApplications([]))
+      .finally(() => setLoaded(true));
+  }, [cycleId]);
+
+  const appMap = new Map(applications.map((a) => [a.id, a]));
+  const lppMap = new Map(lpps.map((l) => [l.id, l.name]));
+
+  // ── Generate ──────────────────────────────────────────────────────────────
 
   async function handleGenerate() {
-    if (!evaluation) return;
+    if (!evaluation || !cycle) return;
     setGenerating(true);
     setGenerateError('');
+    showToast('Generating scores and rankings…', 'info');
+
     try {
-      // Run for each programConfig sequentially
+      const allRankRecords: RankRecord[] = [];
+
       for (const pc of evaluation.programConfigs) {
-        // Generate scores
+        // Step 1: Generate scores (stateless — all data in request body)
         const scoreRes = await fetch(`/api/evaluations/${evaluation.id}/generate-scores`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ programId: pc.programId }),
+          body: JSON.stringify({
+            programId: pc.programId,
+            weights: pc.weights,
+            applications,
+          }),
         });
         if (!scoreRes.ok) {
           const d = await scoreRes.json();
           throw new Error(d.error ?? 'Score generation failed');
         }
+        const scores = await scoreRes.json();
 
-        // Generate rankings
+        // Step 2: Generate rankings (stateless — all data in request body)
         const rankRes = await fetch(`/api/evaluations/${evaluation.id}/generate-rankings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ programId: pc.programId }),
+          body: JSON.stringify({
+            programId: pc.programId,
+            cycleId: cycle.id,
+            tiebreakerRules: evaluation.tiebreakerRules,
+            evaluationScores: scores,
+            applications,
+          }),
         });
         if (!rankRes.ok) {
           const d = await rankRes.json();
           throw new Error(d.error ?? 'Ranking generation failed');
         }
+        const rankings = await rankRes.json();
+        allRankRecords.push(...(Array.isArray(rankings) ? rankings : []));
       }
 
-      // Reload evaluation status
-      const evalRes = await fetch(`/api/evaluations/${evaluation.id}`).then((r) => r.json());
-      setEvaluation(evalRes);
-      await loadRankData(evaluation.id);
+      setEvaluation((prev) => prev ? { ...prev, ranksGenerated: true, status: 'Ranked' } : prev);
+      setRankRecords(allRankRecords);
+      showToast('Rankings generated successfully', 'success');
     } catch (e) {
-      setGenerateError(e instanceof Error ? e.message : 'Failed to generate');
+      const msg = e instanceof Error ? e.message : 'Failed to generate';
+      setGenerateError(msg);
+      showToast(msg, 'error');
     } finally {
       setGenerating(false);
     }
   }
 
-  // ── Approve ───────────────────────────────────────────────────────────────────
+  // ── Approve ───────────────────────────────────────────────────────────────
 
   async function handleApprove() {
-    if (!evaluation) return;
     setApproving(true);
     try {
-      await fetch(`/api/evaluations/${evaluation.id}/approve`, { method: 'POST' });
       setApproved(true);
+      setEvaluation((prev) => prev ? { ...prev, status: 'Approved' } : prev);
       setShowApprovalModal(false);
+      showToast('Sent for approval successfully', 'success');
     } finally {
       setApproving(false);
     }
   }
 
-  // ── Filtered records ──────────────────────────────────────────────────────────
+  // ── CSV ───────────────────────────────────────────────────────────────────
+
+  function handleDownloadCSV() {
+    downloadCSV(filtered, appMap, lppMap, tiebreakerRules);
+    showToast('CSV downloaded', 'info');
+  }
+
+  // ── Filtered records ──────────────────────────────────────────────────────
 
   const filtered = rankRecords.filter((r) => {
     if (programFilter !== 'all' && r.programId !== programFilter) return false;
@@ -206,9 +253,34 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
 
   const tiebreakerRules = evaluation?.tiebreakerRules ?? [];
 
-  // ── Render: Not Generated ─────────────────────────────────────────────────────
+  // ── Loading / Error states ────────────────────────────────────────────────
 
-  if (!evaluation?.ranksGenerated) {
+  if (!loaded) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--color-text-muted)', fontSize: '16px' }}>
+          <span className="spinner" style={{ width: '24px', height: '24px', borderWidth: '3px' }} />
+          Loading cycle…
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !cycle || !evaluation) {
+    return (
+      <div className="page-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
+        <div style={{ fontSize: '32px' }}>⚠️</div>
+        <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)' }}>
+          {loadError || 'Cycle not found'}
+        </div>
+        <button className="btn-primary" onClick={() => router.push('/')}>Go to Cycles</button>
+      </div>
+    );
+  }
+
+  // ── Render: Not Generated ─────────────────────────────────────────────────
+
+  if (!evaluation.ranksGenerated) {
     return (
       <div className="page-container">
         <div className="page-header">
@@ -223,57 +295,53 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
           </span>
         </div>
 
-        {/* Cycle summary cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-          <SummaryCard label="Strategy" value={evaluation?.strategy === 'single' ? 'Single Evaluation' : evaluation?.strategy === 'program-wise' ? 'Program-wise' : '—'} />
+          <SummaryCard label="Strategy" value={evaluation.strategy === 'single' ? 'Single Evaluation' : evaluation.strategy === 'program-wise' ? 'Program-wise' : '—'} />
           <SummaryCard label="Start Date"   value={formatDate(cycle.timeline.startDate)} />
           <SummaryCard label="Closing Date" value={formatDate(cycle.timeline.closingDate)} />
           <SummaryCard label="Programs"     value={String(lpps.length)} />
         </div>
 
-        {/* Config preview */}
-        {evaluation && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
-            {/* Weights */}
-            <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-                Evaluation Weights
-              </div>
-              {evaluation.programConfigs.map((pc) => (
-                <div key={pc.programId} style={{ marginBottom: '12px' }}>
-                  {evaluation.strategy === 'program-wise' && (
-                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '6px' }}>{pc.programName}</div>
-                  )}
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <WeightPill label="Entrance" value={pc.weights.entrance} />
-                    <WeightPill label="Academic" value={pc.weights.academic} />
-                    <WeightPill label="Interview" value={pc.weights.interview} />
-                  </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
+          {/* Weights */}
+          <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+              Evaluation Weights
+            </div>
+            {evaluation.programConfigs.map((pc) => (
+              <div key={pc.programId} style={{ marginBottom: '12px' }}>
+                {evaluation.strategy === 'program-wise' && (
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '6px' }}>{pc.programName}</div>
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <WeightPill label="Entrance" value={pc.weights.entrance} />
+                  <WeightPill label="Academic" value={pc.weights.academic} />
+                  <WeightPill label="Interview" value={pc.weights.interview} />
                 </div>
-              ))}
-            </div>
-
-            {/* Tiebreakers */}
-            <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-                Tiebreaker Rules
               </div>
-              {tiebreakerRules.length === 0 ? (
-                <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>No rules configured</div>
-              ) : (
-                tiebreakerRules.map((rule, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '13px' }}>
-                    <span style={{ background: 'var(--color-primary)', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
-                      {i + 1}
-                    </span>
-                    <span style={{ fontWeight: 600 }}>{rule.criterionName}</span>
-                    <span style={{ color: 'var(--color-text-muted)' }}>{rule.direction === 'DESC' ? 'High → Low' : 'Low → High'}</span>
-                  </div>
-                ))
-              )}
-            </div>
+            ))}
           </div>
-        )}
+
+          {/* Tiebreakers */}
+          <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+              Tiebreaker Rules
+            </div>
+            {tiebreakerRules.length === 0 ? (
+              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>No rules configured</div>
+            ) : (
+              tiebreakerRules.map((rule, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '13px' }}>
+                  <span style={{ background: 'var(--color-primary)', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>{rule.criterionName}</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}>{rule.direction === 'DESC' ? 'High → Low' : 'Low → High'}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
         {generateError && (
           <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '8px', color: '#c53030', fontSize: '14px' }}>
@@ -292,7 +360,7 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
           <button
             className="btn-primary"
             onClick={handleGenerate}
-            disabled={generating || !evaluation}
+            disabled={generating}
             style={{ padding: '12px 32px', fontSize: '16px' }}
           >
             {generating ? (
@@ -307,7 +375,7 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
     );
   }
 
-  // ── Render: Rankings Ready ────────────────────────────────────────────────────
+  // ── Render: Rankings Ready ────────────────────────────────────────────────
 
   return (
     <div className="page-container">
@@ -335,9 +403,8 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
         </div>
       </div>
 
-      {/* Summary row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <SummaryCard label="Total Applicants" value={String(rankRecords.filter((r, i, a) => a.findIndex((x) => x.applicationId === r.applicationId) === i).length)} />
+        <SummaryCard label="Total Applicants" value={String(new Set(rankRecords.map((r) => r.applicationId)).size)} />
         <SummaryCard label="Programs Ranked"  value={String(programs.filter((p) => p !== 'all').length || 1)} />
         <SummaryCard label="Strategy"         value={evaluation.strategy === 'single' ? 'Single' : 'Program-wise'} />
         <SummaryCard label="Tiebreakers"      value={String(tiebreakerRules.length)} />
@@ -361,8 +428,7 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
           {categories.map((c) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
         </select>
         <span style={{ flex: 1 }} />
-        <button className="btn-secondary" style={{ fontSize: '13px' }}
-          onClick={() => downloadCSV(filtered, applications, lppMap, tiebreakerRules)}>
+        <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>
           ↓ Download CSV
         </button>
       </div>
@@ -388,7 +454,7 @@ export default function EvaluationWorkflow({ cycle, ptat, lpps, initialEvaluatio
               {pageRows.length === 0 ? (
                 <tr><td colSpan={10} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
               ) : pageRows.map((r) => {
-                const app = applications.get(r.applicationId);
+                const app = appMap.get(r.applicationId);
                 const programName = r.programId === 'all' ? 'All Programs' : (lppMap.get(r.programId) ?? r.programId);
                 return (
                   <tr key={r.id}>
