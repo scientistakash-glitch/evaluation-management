@@ -8,17 +8,18 @@
     "start": "next start"
   },
   "dependencies": {
+    "@salesforce-ux/design-system": "^2.24.3",
+    "@salesforce/design-system-react": "^0.10.50",
+    "@vercel/kv": "^3.0.0",
+    "nanoid": "^3.3.7",
     "next": "14.2.5",
     "react": "^18",
-    "react-dom": "^18",
-    "@salesforce/design-system-react": "^0.10.50",
-    "@salesforce-ux/design-system": "^2.24.3",
-    "nanoid": "^3.3.7"
+    "react-dom": "^18"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^18",
-    "@types/react-dom": "^18"
+    "@types/react-dom": "^18",
+    "typescript": "^5"
   }
 }
