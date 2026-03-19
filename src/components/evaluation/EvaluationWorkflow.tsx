@@ -8,6 +8,7 @@ import { useToast } from '@/components/common/ToastContext';
 
 interface Cycle {
   id: string; name: string; number: number; academicYear: string;
+  hasPreviousCycle: boolean;
   ptatId: string; lppIds: string[];
   timeline: { startDate: string; offerReleaseDate: string; acceptanceDeadline: string; paymentDeadline: string; closingDate: string; };
   evaluationStrategy: 'single' | 'program-wise' | null;
@@ -108,6 +109,10 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   const [loaded, setLoaded]         = useState(false);
   const [loadError, setLoadError]   = useState('');
 
+  // Generation choice
+  const [generationMode, setGenerationMode] = useState<'fresh' | 'previous'>('fresh');
+  const [importedFromPrevious, setImportedFromPrevious] = useState(false);
+
   // Rankings
   const [rankRecords, setRankRecords] = useState<RankRecord[]>([]);
   const [generating, setGenerating]   = useState(false);
@@ -162,21 +167,25 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     if (!evaluation || !cycle) return;
     setGenerating(true);
     setGenerateError('');
-    showToast('Generating scores and rankings…', 'info');
+
+    // For "previous cycle": use default weights (60/30/10) to simulate importing
+    const isPrevious = generationMode === 'previous';
+    showToast(isPrevious ? 'Importing previous cycle rankings…' : 'Generating scores and rankings…', 'info');
 
     try {
       const allRankRecords: RankRecord[] = [];
 
-      for (const pc of evaluation.programConfigs) {
+      // Build program configs — for "previous" mode use default weights regardless of configured ones
+      const configsToRun = evaluation.programConfigs.map((pc) =>
+        isPrevious ? { ...pc, weights: { entrance: 60, academic: 30, interview: 10 } } : pc
+      );
+
+      for (const pc of configsToRun) {
         // Step 1: Generate scores (stateless — all data in request body)
         const scoreRes = await fetch(`/api/evaluations/${evaluation.id}/generate-scores`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            programId: pc.programId,
-            weights: pc.weights,
-            applications,
-          }),
+          body: JSON.stringify({ programId: pc.programId, weights: pc.weights, applications }),
         });
         if (!scoreRes.ok) {
           const d = await scoreRes.json();
@@ -206,7 +215,8 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
 
       setEvaluation((prev) => prev ? { ...prev, ranksGenerated: true, status: 'Ranked' } : prev);
       setRankRecords(allRankRecords);
-      showToast('Rankings generated successfully', 'success');
+      if (isPrevious) setImportedFromPrevious(true);
+      showToast(isPrevious ? 'Previous cycle rankings imported' : 'Rankings generated successfully', 'success');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to generate';
       setGenerateError(msg);
@@ -349,26 +359,72 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
           </div>
         )}
 
-        <div style={{ textAlign: 'center', padding: '32px', background: 'white', borderRadius: '14px', border: '1px solid var(--color-border)' }}>
-          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🚀</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '8px' }}>
-            Ready to Generate Rankings
+        {/* Generation choice */}
+        <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '28px', marginBottom: '16px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '18px' }}>
+            How would you like to generate rankings?
           </div>
-          <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
-            This will compute composite scores and generate all rankings in one go.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+            {/* Fresh option */}
+            <label
+              className={`strategy-card${generationMode === 'fresh' ? ' selected' : ''}`}
+              style={{ cursor: 'pointer', alignItems: 'flex-start' }}
+              onClick={() => setGenerationMode('fresh')}
+            >
+              <input type="radio" name="genMode" value="fresh" checked={generationMode === 'fresh'}
+                onChange={() => setGenerationMode('fresh')} style={{ marginTop: '3px', marginRight: '12px' }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '3px' }}>Generate Fresh Scores &amp; Rankings</div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  Compute new composite scores from current applicant data using configured weights and tiebreaker rules.
+                </div>
+              </div>
+            </label>
+
+            {/* Previous cycle option */}
+            <label
+              className={`strategy-card${generationMode === 'previous' ? ' selected' : ''}`}
+              style={{
+                cursor: cycle.hasPreviousCycle ? 'pointer' : 'not-allowed',
+                alignItems: 'flex-start',
+                opacity: cycle.hasPreviousCycle ? 1 : 0.55,
+              }}
+              onClick={() => cycle.hasPreviousCycle && setGenerationMode('previous')}
+            >
+              <input type="radio" name="genMode" value="previous" checked={generationMode === 'previous'}
+                onChange={() => cycle.hasPreviousCycle && setGenerationMode('previous')}
+                disabled={!cycle.hasPreviousCycle}
+                style={{ marginTop: '3px', marginRight: '12px' }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '3px' }}>
+                  Use Previous Cycle Rankings
+                  {!cycle.hasPreviousCycle && (
+                    <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: 500, color: 'var(--color-text-muted)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1px 6px' }}>
+                      No previous cycle
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  Import the ranked list from the most recent completed cycle for this program group. Preview and send directly for approval.
+                </div>
+              </div>
+            </label>
           </div>
+
           <button
             className="btn-primary"
             onClick={handleGenerate}
             disabled={generating}
-            style={{ padding: '12px 32px', fontSize: '16px' }}
+            style={{ padding: '12px 32px', fontSize: '15px' }}
           >
             {generating ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                Generating…
+                {generationMode === 'previous' ? 'Importing…' : 'Generating…'}
               </span>
-            ) : 'Generate Scores & Rankings'}
+            ) : (
+              generationMode === 'previous' ? 'Import Previous Rankings →' : 'Generate Scores & Rankings →'
+            )}
           </button>
         </div>
       </div>
@@ -402,6 +458,13 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
           )}
         </div>
       </div>
+
+      {importedFromPrevious && (
+        <div style={{ marginBottom: '20px', padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '13px', color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '16px' }}>📋</span>
+          <strong>Imported from previous cycle</strong> — Rankings are based on the most recent completed cycle for this program group. Review and send for approval.
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
         <SummaryCard label="Total Applicants" value={String(new Set(rankRecords.map((r) => r.applicationId)).size)} />

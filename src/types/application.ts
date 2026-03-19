@@ -6,6 +6,7 @@ export interface Application {
   rollNumber: string;
   dateOfBirth: string;
   category: ApplicationCategory;
+  lppPreference: string;
   entranceScore: number;
   academicScore: number;
   interviewScore: number;
