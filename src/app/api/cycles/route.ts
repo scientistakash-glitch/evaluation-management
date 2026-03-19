@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllCycles, createCycle } from '@/lib/data/cycles';
+import { createEvaluation } from '@/lib/data/evaluations';
 import { validateNonOverlapping } from '@/lib/utils/dateUtils';
-import { CycleStatus } from '@/types';
+import type { CycleStatus } from '@/types';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const ptatId = searchParams.get('ptatId') ?? undefined;
     const status = searchParams.get('status') as CycleStatus | null;
-    const cycles = await getAllCycles({ ptatId, status: status ?? undefined });
+    const academicYear = searchParams.get('academicYear') ?? undefined;
+    let cycles = await getAllCycles({ ptatId, status: status ?? undefined });
+    if (academicYear) cycles = cycles.filter((c) => c.academicYear === academicYear);
     return NextResponse.json(cycles);
   } catch {
     return NextResponse.json({ error: 'Failed to fetch cycles' }, { status: 500 });
@@ -19,17 +22,16 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      name,
-      number,
       academicYear,
-      hasPreviousCycle,
       ptatId,
       lppIds,
       timeline,
       evaluationStrategy,
+      programConfigs,
+      tiebreakerRules,
     } = body;
 
-    if (!name || number == null || !academicYear || !ptatId || !lppIds || !timeline) {
+    if (!academicYear || !ptatId || !lppIds || !timeline) {
       return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
     }
 
@@ -43,14 +45,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'All timeline dates are required' }, { status: 400 });
     }
 
-    // Check for unique cycle number
     const existing = await getAllCycles();
-    const duplicateNumber = existing.find((c) => c.number === number);
-    if (duplicateNumber) {
-      return NextResponse.json({ error: `Cycle number ${number} already exists` }, { status: 409 });
-    }
 
-    // Overlap validation
+    // Auto-calculate cycle number for this PTAT + academicYear
+    const samePtatYear = existing.filter(
+      (c) => c.ptatId === ptatId && c.academicYear === academicYear
+    );
+    const cycleNumber = samePtatYear.length + 1;
+
+    // Overlap validation (date range within same PTAT)
     const overlapError = validateNonOverlapping(
       { ptatId, startDate: timeline.startDate, closingDate: timeline.closingDate },
       existing
@@ -59,16 +62,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: overlapError }, { status: 409 });
     }
 
+    // Auto-generate cycle name
+    const ptatName = body.ptatName ?? ptatId;
+    const name = `${ptatName} – ${academicYear} – Cycle ${cycleNumber}`;
+
     const cycle = await createCycle({
       name,
-      number,
+      number: cycleNumber,
       academicYear,
-      hasPreviousCycle: hasPreviousCycle ?? false,
+      hasPreviousCycle: samePtatYear.length > 0,
       ptatId,
       lppIds,
       timeline,
       evaluationStrategy: evaluationStrategy ?? null,
       status: 'Planned',
+    });
+
+    // Create the Evaluation record inline so the detail page always has one
+    await createEvaluation({
+      cycleId: cycle.id,
+      strategy: evaluationStrategy ?? null,
+      programConfigs: programConfigs ?? [],
+      tiebreakerRules: tiebreakerRules ?? [],
+      ranksGenerated: false,
+      status: 'Draft',
     });
 
     return NextResponse.json(cycle, { status: 201 });

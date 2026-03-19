@@ -1,6 +1,7 @@
+import type { TiebreakerRule } from './tiebreakerConfig';
+
 export type EvaluationStatus = 'Draft' | 'Scored' | 'Ranked' | 'Approved';
 export type EvaluationStrategy = 'single' | 'program-wise';
-export type TieBreakerType = 'entrance' | 'academic';
 
 export interface ProgramWeights {
   entrance: number;   // 0–100
@@ -10,7 +11,7 @@ export interface ProgramWeights {
 }
 
 export interface ProgramConfig {
-  programId: string;       // lppId
+  programId: string;       // lppId or 'all'
   programName: string;
   weights: ProgramWeights;
   scoresGenerated: boolean;
@@ -23,7 +24,7 @@ export interface Evaluation {
   // For 'single': one config in programConfigs with programId = 'all'
   // For 'program-wise': one config per lppId
   programConfigs: ProgramConfig[];
-  tieBreaker: TieBreakerType | null;
+  tiebreakerRules: TiebreakerRule[];  // ordered list; last resort = applicationId alphabetical
   ranksGenerated: boolean;
   status: EvaluationStatus;
   approvedAt?: string;

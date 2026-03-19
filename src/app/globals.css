@@ -2,6 +2,7 @@
   --color-primary: #5C1010;
   --color-primary-hover: #7B1A1A;
   --color-primary-light: #B04040;
+  --color-primary-bg: #FEF2F2;
   --color-bg: #F5F0F0;
   --color-card: #FFFFFF;
   --color-border: #E8E0E0;
@@ -556,3 +557,45 @@ body { background: var(--color-bg); font-family: -apple-system, BlinkMacSystemFo
   font-weight: 600;
 }
 .program-tab:hover { color: var(--color-primary); }
+
+/* Tiebreaker row (wizard step 5 & rank config) */
+.tiebreaker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.tiebreaker-priority {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+  min-width: 28px;
+}
+.icon-btn.danger { color: #c53030; }
+.icon-btn.danger:hover { background: #fff5f5; }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.page-btn {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text);
+  font-weight: 500;
+}
+.page-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Color fix: primary-light should be very light, not mid-tone */

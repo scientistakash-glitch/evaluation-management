@@ -1,497 +1,304 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
-interface PTAT {
-  id: string;
-  name: string;
-  code: string;
+interface PTAT { id: string; name: string; code: string; }
+interface LPP  { id: string; ptatId: string; name: string; code: string; }
+
+interface TiebreakerRule {
+  order: number;
+  criterionId: 'entrance' | 'academic' | 'interview';
+  criterionName: string;
+  direction: 'DESC' | 'ASC';
 }
 
-interface LPP {
-  id: string;
-  ptatId: string;
-  name: string;
-  code: string;
-  duration: number;
-}
+interface ProgramWeights { entrance: number; academic: number; interview: number; }
+interface ProgramConfig  { programId: string; programName: string; weights: ProgramWeights; scoresGenerated: boolean; }
 
-interface CycleTimeline {
-  startDate: string;
-  offerReleaseDate: string;
-  acceptanceDeadline: string;
-  paymentDeadline: string;
-  closingDate: string;
-}
-
-interface WizardState {
-  currentStep: 1 | 2 | 3 | 4 | 5;
-  step1: { name: string; number: string; academicYear: string; hasPreviousCycle: boolean };
-  step2: { ptatId: string; lppIds: string[] };
-  step3: { previousCycleId: string | null };
-  step4: { timeline: CycleTimeline };
-  step5: { evaluationStrategy: 'single' | 'program-wise' | null };
-}
-
-const STEP_LABELS = ['Basic Details', 'Program Group', 'Seat Matrix', 'Timelines', 'Evaluation Strategy'];
 const ACADEMIC_YEARS = ['2024-2025', '2025-2026', '2026-2027', '2027-2028'];
+const CRITERION_OPTIONS: { id: 'entrance' | 'academic' | 'interview'; label: string }[] = [
+  { id: 'entrance',  label: 'Entrance Score' },
+  { id: 'academic',  label: 'Academic Score' },
+  { id: 'interview', label: 'Interview Score' },
+];
 
-// ─── Step Progress Indicator ──────────────────────────────────────────────────
-
-function StepProgress({ currentStep }: { currentStep: number }) {
-  return (
-    <div className="step-progress">
-      {STEP_LABELS.map((label, i) => {
-        const stepNum = i + 1;
-        const isActive = stepNum === currentStep;
-        const isDone = stepNum < currentStep;
-        return (
-          <React.Fragment key={stepNum}>
-            <div className="step-item">
-              <div className={`step-circle${isActive || isDone ? ' active' : ''}`}>
-                {isDone ? '✓' : stepNum}
-              </div>
-              <span className={`step-label${isActive ? ' active' : ''}`}>{label}</span>
-            </div>
-            {i < STEP_LABELS.length - 1 && <div className="step-connector" />}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Toggle Switch ────────────────────────────────────────────────────────────
-
-function ToggleSwitch({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="toggle-switch" style={{ userSelect: 'none' }}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-      />
-      <div
-        className="toggle-track"
-        style={{ background: checked ? 'var(--color-primary)' : '#D0C8C8', cursor: 'pointer' }}
-        onClick={() => onChange(!checked)}
-      >
-        <div
-          className="toggle-thumb"
-          style={{ left: checked ? '23px' : '3px' }}
-        />
-      </div>
-      <span style={{ fontSize: '14px', color: 'var(--color-text)', cursor: 'pointer' }}>
-        {label}
-      </span>
-    </label>
-  );
-}
-
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function CreateCyclePage() {
   const router = useRouter();
 
-  const [wizard, setWizard] = useState<WizardState>({
-    currentStep: 1,
-    step1: { name: '', number: '', academicYear: '2025-2026', hasPreviousCycle: false },
-    step2: { ptatId: '', lppIds: [] },
-    step3: { previousCycleId: null },
-    step4: {
-      timeline: {
-        startDate: '',
-        offerReleaseDate: '',
-        acceptanceDeadline: '',
-        paymentDeadline: '',
-        closingDate: '',
-      },
-    },
-    step5: { evaluationStrategy: null },
+  // Step state
+  const [step, setStep] = useState(1);
+  const TOTAL_STEPS = 5;
+
+  // Step 1 — Academic Year
+  const [academicYear, setAcademicYear] = useState('');
+
+  // Step 2 — Program Group
+  const [ptats, setPtats]                     = useState<PTAT[]>([]);
+  const [lpps,  setLpps]                      = useState<LPP[]>([]);
+  const [selectedPtatId, setSelectedPtatId]   = useState('');
+  const [cycleNumber, setCycleNumber]         = useState<number | null>(null);
+  const [loadingPtats, setLoadingPtats]       = useState(false);
+  const [loadingCycleNum, setLoadingCycleNum] = useState(false);
+
+  // Step 3 — Timelines
+  const [timeline, setTimeline] = useState({
+    startDate: '', offerReleaseDate: '', acceptanceDeadline: '',
+    paymentDeadline: '', closingDate: '',
   });
 
-  const [ptats, setPtats] = useState<PTAT[]>([]);
-  const [lpps, setLpps] = useState<LPP[]>([]);
-  const [previousStats, setPreviousStats] = useState<
-    { lppId: string; lppName: string; intake: number; previousOffers: number; previousAcceptances: number }[]
-  >([]);
-  const [step1Errors, setStep1Errors] = useState<Record<string, string>>({});
-  const [step4Errors, setStep4Errors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
+  // Step 4 — Strategy
+  const [strategy, setStrategy] = useState<'single' | 'program-wise' | null>(null);
 
-  // Load PTATs on mount
+  // Step 5 — Criteria & Tiebreakers
+  const [programConfigs, setProgramConfigs] = useState<ProgramConfig[]>([]);
+  const [tiebreakerRules, setTiebreakerRules] = useState<TiebreakerRule[]>([
+    { order: 0, criterionId: 'entrance', criterionName: 'Entrance Score', direction: 'DESC' },
+  ]);
+
+  // Submission
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]           = useState('');
+
+  // Load PTATs once
   useEffect(() => {
+    setLoadingPtats(true);
     fetch('/api/ptats')
       .then((r) => r.json())
-      .then((data) => setPtats(Array.isArray(data) ? data : []));
+      .then((data) => setPtats(Array.isArray(data) ? data : []))
+      .finally(() => setLoadingPtats(false));
   }, []);
 
-  // Load LPPs when ptatId changes
+  // Load LPPs and cycle number when PTAT + year selected
   useEffect(() => {
-    if (!wizard.step2.ptatId) return;
-    fetch(`/api/lpps?ptatId=${wizard.step2.ptatId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        setLpps(list);
-        setWizard((prev) => ({
-          ...prev,
-          step2: { ...prev.step2, lppIds: list.map((l: LPP) => l.id) },
-        }));
-      });
-  }, [wizard.step2.ptatId]);
+    if (!selectedPtatId || !academicYear) return;
+    setLoadingCycleNum(true);
+    Promise.all([
+      fetch(`/api/lpps?ptatId=${selectedPtatId}`).then((r) => r.json()),
+      fetch(`/api/cycles?ptatId=${selectedPtatId}&academicYear=${academicYear}`).then((r) => r.json()),
+    ]).then(([lppData, cycleData]) => {
+      const lppList: LPP[] = Array.isArray(lppData) ? lppData : [];
+      setLpps(lppList);
+      const count = Array.isArray(cycleData) ? cycleData.length : 0;
+      setCycleNumber(count + 1);
+    }).finally(() => setLoadingCycleNum(false));
+  }, [selectedPtatId, academicYear]);
 
-  // Load previous stats for seat matrix (step 3)
-  const loadPreviousStats = useCallback(async () => {
-    if (!wizard.step2.ptatId || !wizard.step1.hasPreviousCycle) {
-      // Build from lpps with zeros
-      const stats = lpps.map((l) => ({
-        lppId: l.id,
-        lppName: l.name,
-        intake: 60,
-        previousOffers: 0,
-        previousAcceptances: 0,
-      }));
-      setPreviousStats(stats);
-      return;
-    }
-    try {
-      // Find previous cycles for this ptat
-      const cyclesRes = await fetch(`/api/cycles?ptatId=${wizard.step2.ptatId}`).then((r) => r.json());
-      const prevCycles = (Array.isArray(cyclesRes) ? cyclesRes : []).filter(
-        (c: { status: string }) => c.status === 'Closed' || c.status === 'Approved'
+  // Build programConfigs when strategy or PTAT/LPPs change (Step 5)
+  useEffect(() => {
+    if (!strategy) return;
+    if (strategy === 'single') {
+      setProgramConfigs([{
+        programId: 'all',
+        programName: 'All Programs',
+        weights: { entrance: 50, academic: 30, interview: 20 },
+        scoresGenerated: false,
+      }]);
+    } else {
+      const ptatLpps = lpps.filter((l) => l.ptatId === selectedPtatId);
+      setProgramConfigs(
+        ptatLpps.map((lpp) => ({
+          programId: lpp.id,
+          programName: lpp.name,
+          weights: { entrance: 50, academic: 30, interview: 20 },
+          scoresGenerated: false,
+        }))
       );
-      if (prevCycles.length === 0) {
-        const stats = lpps.map((l) => ({
-          lppId: l.id,
-          lppName: l.name,
-          intake: 60,
-          previousOffers: 0,
-          previousAcceptances: 0,
-        }));
-        setPreviousStats(stats);
-        return;
-      }
-      // Sort by closingDate desc
-      prevCycles.sort(
-        (a: { timeline: { closingDate: string } }, b: { timeline: { closingDate: string } }) =>
-          b.timeline.closingDate.localeCompare(a.timeline.closingDate)
-      );
-      const latestPrev = prevCycles[0];
-      const statsRes = await fetch(`/api/cycles/${latestPrev.id}/previous-stats`).then((r) => r.json());
-      if (statsRes.programs) {
-        setPreviousStats(statsRes.programs);
-      } else {
-        const stats = lpps.map((l) => ({
-          lppId: l.id,
-          lppName: l.name,
-          intake: 60,
-          previousOffers: 0,
-          previousAcceptances: 0,
-        }));
-        setPreviousStats(stats);
-      }
-    } catch {
-      const stats = lpps.map((l) => ({
-        lppId: l.id,
-        lppName: l.name,
-        intake: 60,
-        previousOffers: 0,
-        previousAcceptances: 0,
-      }));
-      setPreviousStats(stats);
     }
-  }, [wizard.step2.ptatId, wizard.step1.hasPreviousCycle, lpps]);
+  }, [strategy, selectedPtatId, lpps]);
 
-  // ── Step 1 Validation ──
-  function validateStep1(): boolean {
-    const errors: Record<string, string> = {};
-    const { name, number, academicYear } = wizard.step1;
-    if (!name.trim() || name.trim().length < 3) {
-      errors.name = 'Cycle name must be at least 3 characters';
-    }
-    const num = parseInt(number);
-    if (!number || isNaN(num) || num < 1) {
-      errors.number = 'Cycle number must be a positive integer';
-    }
-    if (!academicYear) {
-      errors.academicYear = 'Academic year is required';
-    }
-    setStep1Errors(errors);
-    return Object.keys(errors).length === 0;
+  // ── Validation helpers ───────────────────────────────────────────────────────
+
+  function step1Valid() { return !!academicYear; }
+  function step2Valid() { return !!selectedPtatId && cycleNumber !== null; }
+  function step3Valid() {
+    const { startDate, offerReleaseDate, acceptanceDeadline, paymentDeadline, closingDate } = timeline;
+    if (!startDate || !offerReleaseDate || !acceptanceDeadline || !paymentDeadline || !closingDate) return false;
+    return (
+      startDate <= offerReleaseDate &&
+      offerReleaseDate <= acceptanceDeadline &&
+      acceptanceDeadline <= paymentDeadline &&
+      paymentDeadline <= closingDate
+    );
+  }
+  function step4Valid() { return strategy !== null; }
+  function step5Valid() {
+    if (tiebreakerRules.length === 0) return false;
+    return programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5);
   }
 
-  // ── Step 4 Validation ──
-  function validateStep4(): boolean {
-    const errors: Record<string, string> = {};
-    const t = wizard.step4.timeline;
-    if (!t.startDate) errors.startDate = 'Start date is required';
-    if (!t.offerReleaseDate) errors.offerReleaseDate = 'Offer release date is required';
-    if (!t.acceptanceDeadline) errors.acceptanceDeadline = 'Acceptance deadline is required';
-    if (!t.paymentDeadline) errors.paymentDeadline = 'Payment deadline is required';
-    if (!t.closingDate) errors.closingDate = 'Closing date is required';
+  // ── Tiebreaker helpers ───────────────────────────────────────────────────────
 
-    if (
-      t.startDate &&
-      t.offerReleaseDate &&
-      t.offerReleaseDate <= t.startDate
-    ) {
-      errors.offerReleaseDate = 'Must be after start date';
-    }
-    if (
-      t.offerReleaseDate &&
-      t.acceptanceDeadline &&
-      t.acceptanceDeadline <= t.offerReleaseDate
-    ) {
-      errors.acceptanceDeadline = 'Must be after offer release date';
-    }
-    if (
-      t.acceptanceDeadline &&
-      t.paymentDeadline &&
-      t.paymentDeadline <= t.acceptanceDeadline
-    ) {
-      errors.paymentDeadline = 'Must be after acceptance deadline';
-    }
-    if (
-      t.paymentDeadline &&
-      t.closingDate &&
-      t.closingDate <= t.paymentDeadline
-    ) {
-      errors.closingDate = 'Must be after payment deadline';
-    }
-
-    setStep4Errors(errors);
-    return Object.keys(errors).length === 0;
+  function addTiebreakerRule() {
+    const used = new Set(tiebreakerRules.map((r) => r.criterionId));
+    const next = CRITERION_OPTIONS.find((c) => !used.has(c.id));
+    if (!next) return;
+    setTiebreakerRules((prev) => [
+      ...prev,
+      { order: prev.length, criterionId: next.id, criterionName: next.label, direction: 'DESC' },
+    ]);
   }
 
-  // ── Navigation ──
-  async function handleContinue() {
-    const { currentStep } = wizard;
-
-    if (currentStep === 1) {
-      if (!validateStep1()) return;
-    }
-    if (currentStep === 2) {
-      if (!wizard.step2.ptatId) return;
-    }
-    if (currentStep === 3) {
-      // Proceed; stats are read-only
-    }
-    if (currentStep === 4) {
-      if (!validateStep4()) return;
-    }
-
-    if (currentStep === 3) {
-      // entering step 3 — load stats
-      await loadPreviousStats();
-    }
-
-    setWizard((prev) => ({ ...prev, currentStep: (prev.currentStep + 1) as WizardState['currentStep'] }));
+  function removeTiebreakerRule(idx: number) {
+    setTiebreakerRules((prev) =>
+      prev.filter((_, i) => i !== idx).map((r, i) => ({ ...r, order: i }))
+    );
   }
 
-  async function handleBack() {
-    setWizard((prev) => ({ ...prev, currentStep: (prev.currentStep - 1) as WizardState['currentStep'] }));
+  function moveTiebreakerRule(idx: number, dir: -1 | 1) {
+    const next = idx + dir;
+    if (next < 0 || next >= tiebreakerRules.length) return;
+    setTiebreakerRules((prev) => {
+      const arr = [...prev];
+      [arr[idx], arr[next]] = [arr[next], arr[idx]];
+      return arr.map((r, i) => ({ ...r, order: i }));
+    });
   }
 
-  // ── Final Submit ──
-  async function handleCreate() {
-    if (!wizard.step5.evaluationStrategy) return;
-    setIsSaving(true);
-    setSaveError('');
+  function updateTiebreakerRule(idx: number, field: 'criterionId' | 'direction', value: string) {
+    setTiebreakerRules((prev) =>
+      prev.map((r, i) => {
+        if (i !== idx) return r;
+        if (field === 'criterionId') {
+          const opt = CRITERION_OPTIONS.find((c) => c.id === value);
+          return { ...r, criterionId: value as TiebreakerRule['criterionId'], criterionName: opt?.label ?? value };
+        }
+        return { ...r, direction: value as 'DESC' | 'ASC' };
+      })
+    );
+  }
+
+  // ── Weight helpers ───────────────────────────────────────────────────────────
+
+  function updateWeight(programId: string, field: keyof ProgramWeights, value: number) {
+    setProgramConfigs((prev) =>
+      prev.map((pc) =>
+        pc.programId === programId ? { ...pc, weights: { ...pc.weights, [field]: value } } : pc
+      )
+    );
+  }
+
+  function weightsSum(w: ProgramWeights) { return w.entrance + w.academic + w.interview; }
+
+  // ── Submit ───────────────────────────────────────────────────────────────────
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError('');
     try {
-      const body = {
-        name: wizard.step1.name.trim(),
-        number: parseInt(wizard.step1.number),
-        academicYear: wizard.step1.academicYear,
-        hasPreviousCycle: wizard.step1.hasPreviousCycle,
-        ptatId: wizard.step2.ptatId,
-        lppIds: wizard.step2.lppIds,
-        timeline: wizard.step4.timeline,
-        evaluationStrategy: wizard.step5.evaluationStrategy,
-      };
+      const ptat = ptats.find((p) => p.id === selectedPtatId);
+      const lppIds = lpps.filter((l) => l.ptatId === selectedPtatId).map((l) => l.id);
 
       const res = await fetch('/api/cycles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          academicYear,
+          ptatId: selectedPtatId,
+          ptatName: ptat?.name ?? selectedPtatId,
+          lppIds,
+          timeline,
+          evaluationStrategy: strategy,
+          programConfigs,
+          tiebreakerRules,
+        }),
       });
 
       if (!res.ok) {
         const data = await res.json();
-        setSaveError(data.error ?? 'Failed to create cycle');
+        setError(data.error ?? 'Failed to create cycle');
         return;
       }
 
-      const newCycle = await res.json();
-      router.push(`/cycle/${newCycle.id}/evaluation`);
+      const cycle = await res.json();
+      router.push(`/cycle/${cycle.id}/evaluation`);
     } finally {
-      setIsSaving(false);
+      setSubmitting(false);
     }
   }
 
-  // ─── Render Steps ──────────────────────────────────────────────────────────
+  // ── Step renderers ───────────────────────────────────────────────────────────
+
+  const selectedPtat = ptats.find((p) => p.id === selectedPtatId);
 
   function renderStep1() {
-    const { name, number, academicYear, hasPreviousCycle } = wizard.step1;
-    const update = (field: string, value: string | boolean) =>
-      setWizard((prev) => ({ ...prev, step1: { ...prev.step1, [field]: value } }));
-
     return (
-      <div>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '24px' }}>
-          Basic Details
-        </h2>
-
-        <div className="form-group">
-          <label className="form-label">Cycle Name *</label>
-          <input
-            className="form-input"
-            type="text"
-            placeholder="e.g. B.Tech Admissions 2025"
-            value={name}
-            onChange={(e) => update('name', e.target.value)}
-          />
-          {step1Errors.name && <div className="field-error">{step1Errors.name}</div>}
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Cycle Number *</label>
-          <input
-            className="form-input"
-            type="number"
-            placeholder="e.g. 1"
-            min={1}
-            value={number}
-            onChange={(e) => update('number', e.target.value)}
-          />
-          {step1Errors.number && <div className="field-error">{step1Errors.number}</div>}
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Academic Year *</label>
-          <select
-            className="form-select"
-            value={academicYear}
-            onChange={(e) => update('academicYear', e.target.value)}
-          >
-            {ACADEMIC_YEARS.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          {step1Errors.academicYear && <div className="field-error">{step1Errors.academicYear}</div>}
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Previous Cycle Exists</label>
-          <ToggleSwitch
-            checked={hasPreviousCycle}
-            onChange={(v) => update('hasPreviousCycle', v)}
-            label={hasPreviousCycle ? 'Yes – use previous cycle data' : 'No – this is the first cycle'}
-          />
+      <div className="wizard-step">
+        <h2 className="step-title">Select Academic Year</h2>
+        <p className="step-subtitle">Choose the academic year for this admissions cycle.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px' }}>
+          {ACADEMIC_YEARS.map((y) => (
+            <label key={y} className={`strategy-card${academicYear === y ? ' selected' : ''}`}
+              style={{ cursor: 'pointer' }} onClick={() => setAcademicYear(y)}>
+              <input type="radio" name="year" value={y} checked={academicYear === y}
+                onChange={() => setAcademicYear(y)} style={{ marginRight: '10px' }} />
+              <span style={{ fontSize: '16px', fontWeight: 600 }}>{y}</span>
+            </label>
+          ))}
         </div>
       </div>
     );
   }
 
   function renderStep2() {
-    const selectedPtatId = wizard.step2.ptatId;
-
     return (
-      <div>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '8px' }}>
-          Program Group
-        </h2>
-        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
-          Select the program group (PTAT) for this cycle. All programs under it will be included.
-        </p>
+      <div className="wizard-step">
+        <h2 className="step-title">Program Group</h2>
+        <p className="step-subtitle">Select the program group. The cycle number is auto-assigned.</p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '28px' }}>
-          {ptats.map((ptat) => {
-            const ptatLpps = lpps.filter((l) => l.ptatId === ptat.id);
-            const isSelected = selectedPtatId === ptat.id;
-            return (
-              <div
-                key={ptat.id}
-                className={`ptat-card${isSelected ? ' selected' : ''}`}
-                onClick={() =>
-                  setWizard((prev) => ({ ...prev, step2: { ptatId: ptat.id, lppIds: [] } }))
-                }
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)' }}>
-                      {ptat.name}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                      Code: {ptat.code}
-                    </div>
-                  </div>
-                  {isSelected && (
-                    <span
-                      style={{
-                        background: 'var(--color-primary)',
-                        color: 'white',
-                        borderRadius: '999px',
-                        padding: '4px 14px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Selected
-                    </span>
-                  )}
+        {loadingPtats ? (
+          <div style={{ color: 'var(--color-text-muted)' }}>Loading programs…</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {ptats.map((ptat) => (
+              <label key={ptat.id} className={`strategy-card${selectedPtatId === ptat.id ? ' selected' : ''}`}
+                style={{ cursor: 'pointer', alignItems: 'flex-start' }}
+                onClick={() => setSelectedPtatId(ptat.id)}>
+                <input type="radio" name="ptat" value={ptat.id} checked={selectedPtatId === ptat.id}
+                  onChange={() => setSelectedPtatId(ptat.id)}
+                  style={{ marginTop: '3px', marginRight: '10px' }} />
+                <div>
+                  <div style={{ fontSize: '15px', fontWeight: 700 }}>{ptat.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{ptat.code}</div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {selectedPtatId && lpps.length > 0 && (
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '12px', color: 'var(--color-text)' }}>
-              Programs included:
-            </div>
-            <table className="data-table" style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
-              <thead>
-                <tr>
-                  <th>Program</th>
-                  <th>Code</th>
-                  <th>Duration</th>
-                  <th>Intake</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lpps
-                  .filter((l) => l.ptatId === selectedPtatId)
-                  .map((lpp) => (
-                    <tr key={lpp.id}>
-                      <td style={{ fontWeight: 500 }}>{lpp.name}</td>
-                      <td>{lpp.code}</td>
-                      <td>{lpp.duration} yr{lpp.duration !== 1 ? 's' : ''}</td>
-                      <td>60</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+              </label>
+            ))}
           </div>
         )}
 
-        {ptats.length === 0 && (
-          <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
-            No program groups found. Please create PTATs first.
+        {selectedPtatId && (
+          <div style={{ marginTop: '20px', padding: '14px 18px', background: 'var(--color-primary-bg)', borderRadius: '10px', border: '1px solid var(--color-primary)' }}>
+            {loadingCycleNum ? (
+              <span style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Fetching cycle number…</span>
+            ) : (
+              <>
+                <div style={{ fontSize: '14px', color: 'var(--color-primary)', fontWeight: 700, marginBottom: '4px' }}>
+                  Auto-assigned: Cycle #{cycleNumber}
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                  This will be <strong>Cycle #{cycleNumber}</strong> for{' '}
+                  <strong>{selectedPtat?.name}</strong> in <strong>{academicYear}</strong>
+                </div>
+                {lpps.filter((l) => l.ptatId === selectedPtatId).length > 0 && (
+                  <div style={{ marginTop: '10px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '6px' }}>
+                      Programs under this group:
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {lpps.filter((l) => l.ptatId === selectedPtatId).map((lpp) => (
+                        <span key={lpp.id} className="badge badge-default" style={{ fontSize: '12px' }}>
+                          {lpp.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -499,248 +306,238 @@ export default function CreateCyclePage() {
   }
 
   function renderStep3() {
-    const hasPrev = wizard.step1.hasPreviousCycle;
-
+    const fields: { key: keyof typeof timeline; label: string }[] = [
+      { key: 'startDate',          label: 'Cycle Start Date' },
+      { key: 'offerReleaseDate',   label: 'Offer Release Date' },
+      { key: 'acceptanceDeadline', label: 'Offer Acceptance Deadline' },
+      { key: 'paymentDeadline',    label: 'Payment Deadline' },
+      { key: 'closingDate',        label: 'Cycle Closing Date' },
+    ];
     return (
-      <div>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '8px' }}>
-          Seat Matrix Snapshot
-        </h2>
-        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
-          Read-only snapshot of intake and previous cycle data.
-        </p>
-
-        {!hasPrev ? (
-          <div className="info-card" style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            No previous cycle data available. Offers and acceptances will show as 0.
+      <div className="wizard-step">
+        <h2 className="step-title">Cycle Timelines</h2>
+        <p className="step-subtitle">Set key dates for this admissions cycle. Dates must be in chronological order.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '420px' }}>
+          {fields.map(({ key, label }) => (
+            <div key={key}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '5px' }}>
+                {label}
+              </label>
+              <input
+                type="date"
+                className="form-input"
+                value={timeline[key]}
+                onChange={(e) => setTimeline((t) => ({ ...t, [key]: e.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        {timeline.startDate && timeline.closingDate && !step3Valid() && (
+          <div style={{ marginTop: '12px', color: '#e53e3e', fontSize: '13px' }}>
+            Dates must be in chronological order.
           </div>
-        ) : null}
-
-        {previousStats.length > 0 ? (
-          <table
-            className="data-table"
-            style={{ border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}
-          >
-            <thead>
-              <tr>
-                <th>Program</th>
-                <th>Intake</th>
-                <th>Previous Offers</th>
-                <th>Previous Acceptances</th>
-              </tr>
-            </thead>
-            <tbody>
-              {previousStats.map((row) => (
-                <tr key={row.lppId}>
-                  <td style={{ fontWeight: 500 }}>{row.lppName}</td>
-                  <td>{row.intake}</td>
-                  <td>{row.previousOffers}</td>
-                  <td>{row.previousAcceptances}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Loading seat data...</div>
         )}
       </div>
     );
   }
 
   function renderStep4() {
-    const t = wizard.step4.timeline;
-    const updateTimeline = (field: string, value: string) =>
-      setWizard((prev) => ({
-        ...prev,
-        step4: { timeline: { ...prev.step4.timeline, [field]: value } },
-      }));
-
-    const fields: { field: keyof CycleTimeline; label: string }[] = [
-      { field: 'startDate', label: 'Cycle Start Date' },
-      { field: 'offerReleaseDate', label: 'Offer Release Date' },
-      { field: 'acceptanceDeadline', label: 'Offer Acceptance Deadline' },
-      { field: 'paymentDeadline', label: 'Payment Deadline' },
-      { field: 'closingDate', label: 'Cycle Closing Date' },
-    ];
-
     return (
-      <div>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '8px' }}>
-          Timelines
-        </h2>
-        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
-          Set the key dates for this admissions cycle. Dates must be in chronological order.
-        </p>
-
-        {fields.map(({ field, label }) => (
-          <div className="form-group" key={field}>
-            <label className="form-label">{label} *</label>
-            <input
-              className="form-input"
-              type="date"
-              value={t[field]}
-              onChange={(e) => updateTimeline(field, e.target.value)}
-            />
-            {step4Errors[field] && <div className="field-error">{step4Errors[field]}</div>}
-          </div>
-        ))}
+      <div className="wizard-step">
+        <h2 className="step-title">Evaluation Strategy</h2>
+        <p className="step-subtitle">Choose how scores and rankings will be calculated.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <label className={`strategy-card${strategy === 'single' ? ' selected' : ''}`}
+            style={{ cursor: 'pointer', alignItems: 'flex-start' }}
+            onClick={() => setStrategy('single')}>
+            <input type="radio" name="strategy" value="single" checked={strategy === 'single'}
+              onChange={() => setStrategy('single')} style={{ marginTop: '3px', marginRight: '12px' }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>Single Evaluation</div>
+              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                One unified set of weights applied to all applicants across all programs.
+              </div>
+            </div>
+          </label>
+          <label className={`strategy-card${strategy === 'program-wise' ? ' selected' : ''}`}
+            style={{ cursor: 'pointer', alignItems: 'flex-start' }}
+            onClick={() => setStrategy('program-wise')}>
+            <input type="radio" name="strategy" value="program-wise" checked={strategy === 'program-wise'}
+              onChange={() => setStrategy('program-wise')} style={{ marginTop: '3px', marginRight: '12px' }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>Program-wise Evaluation</div>
+              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                Each program gets its own score weights and separate rankings.
+              </div>
+            </div>
+          </label>
+        </div>
       </div>
     );
   }
 
   function renderStep5() {
-    const strategy = wizard.step5.evaluationStrategy;
-
     return (
-      <div>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '8px' }}>
-          Evaluation Strategy
-        </h2>
-        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>
-          Choose how applicants will be evaluated in this cycle.
-        </p>
+      <div className="wizard-step">
+        <h2 className="step-title">Criteria &amp; Tiebreakers</h2>
+        <p className="step-subtitle">Set evaluation weights and ranking tiebreaker priority rules.</p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <label
-            className={`radio-card${strategy === 'single' ? ' selected' : ''}`}
-          >
-            <input
-              type="radio"
-              name="strategy"
-              value="single"
-              checked={strategy === 'single'}
-              onChange={() =>
-                setWizard((prev) => ({ ...prev, step5: { evaluationStrategy: 'single' } }))
-              }
-            />
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '6px' }}>
-                Fresh Evaluation
+        {/* ── A) Weights ─────────────────────────────────────────────── */}
+        <div style={{ marginBottom: '32px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+            A — Evaluation Weights
+          </h3>
+          {programConfigs.map((pc) => {
+            const sum = weightsSum(pc.weights);
+            const sumOk = Math.abs(sum - 100) < 0.5;
+            return (
+              <div key={pc.programId} style={{ marginBottom: '16px', padding: '16px', border: '1px solid var(--color-border)', borderRadius: '10px', background: 'white' }}>
+                {strategy === 'program-wise' && (
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '12px' }}>
+                    {pc.programName}
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  {(['entrance', 'academic', 'interview'] as const).map((field) => (
+                    <div key={field}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '4px' }}>
+                        {field === 'entrance' ? 'Entrance (%)' : field === 'academic' ? 'Academic (%)' : 'Interview (%)'}
+                      </label>
+                      <input type="number" min={0} max={100} step={1}
+                        className="form-input"
+                        value={pc.weights[field]}
+                        onChange={(e) => updateWeight(pc.programId, field, Number(e.target.value))}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ flex: 1, height: '6px', background: 'var(--color-border)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(sum, 100)}%`, background: sumOk ? 'var(--color-primary)' : '#e53e3e', borderRadius: '3px', transition: 'width 0.2s' }} />
+                  </div>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: sumOk ? 'var(--color-primary)' : '#e53e3e', minWidth: '58px' }}>
+                    {sum}% {sumOk ? '✓' : '≠ 100'}
+                  </span>
+                </div>
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                Start from scratch with a single composite score configuration applied to all
-                candidates uniformly. Best for new cycles without historical data.
-              </div>
-            </div>
-          </label>
-
-          <label
-            className={`radio-card${strategy === 'program-wise' ? ' selected' : ''}`}
-          >
-            <input
-              type="radio"
-              name="strategy"
-              value="program-wise"
-              checked={strategy === 'program-wise'}
-              onChange={() =>
-                setWizard((prev) => ({ ...prev, step5: { evaluationStrategy: 'program-wise' } }))
-              }
-            />
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '6px' }}>
-                Reuse Previous Cycle
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                Configure weights separately per program. If a previous cycle exists for this
-                program group, weights will be pre-filled from that cycle&apos;s evaluation config.
-              </div>
-            </div>
-          </label>
+            );
+          })}
         </div>
 
-        {saveError && (
-          <div
-            style={{
-              marginTop: '20px',
-              background: '#FEE2E2',
-              border: '1px solid #FECACA',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              color: '#C41010',
-              fontSize: '14px',
-            }}
-          >
-            {saveError}
+        {/* ── B) Tiebreakers ─────────────────────────────────────────── */}
+        <div>
+          <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+            B — Tiebreaker Rules
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '14px' }}>
+            Applied in priority order when composite scores are equal. Use ↑↓ to reorder.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {tiebreakerRules.map((rule, idx) => {
+              const usedIds = tiebreakerRules.filter((_, i) => i !== idx).map((r) => r.criterionId);
+              return (
+                <div key={idx} className="tiebreaker-row">
+                  <span className="tiebreaker-priority">#{idx + 1}</span>
+                  <select className="form-input" style={{ flex: 1, fontSize: '13px' }}
+                    value={rule.criterionId}
+                    onChange={(e) => updateTiebreakerRule(idx, 'criterionId', e.target.value)}>
+                    {CRITERION_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id} disabled={usedIds.includes(opt.id)}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select className="form-input" style={{ width: '130px', fontSize: '13px' }}
+                    value={rule.direction}
+                    onChange={(e) => updateTiebreakerRule(idx, 'direction', e.target.value)}>
+                    <option value="DESC">High → Low</option>
+                    <option value="ASC">Low → High</option>
+                  </select>
+                  <button className="icon-btn" onClick={() => moveTiebreakerRule(idx, -1)}
+                    disabled={idx === 0} title="Move up">↑</button>
+                  <button className="icon-btn" onClick={() => moveTiebreakerRule(idx, 1)}
+                    disabled={idx === tiebreakerRules.length - 1} title="Move down">↓</button>
+                  <button className="icon-btn danger" onClick={() => removeTiebreakerRule(idx)}
+                    disabled={tiebreakerRules.length === 1} title="Remove">✕</button>
+                </div>
+              );
+            })}
           </div>
-        )}
+          {tiebreakerRules.length < CRITERION_OPTIONS.length && (
+            <button className="btn-secondary" style={{ marginTop: '12px', fontSize: '13px' }}
+              onClick={addTiebreakerRule}>
+              + Add Tiebreaker Rule
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
-  // ─── Layout ────────────────────────────────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────────────────────────
 
-  const { currentStep } = wizard;
+  function stepValid() {
+    if (step === 1) return step1Valid();
+    if (step === 2) return step2Valid();
+    if (step === 3) return step3Valid();
+    if (step === 4) return step4Valid();
+    if (step === 5) return step5Valid();
+    return false;
+  }
 
-  const canContinue = () => {
-    if (currentStep === 2 && !wizard.step2.ptatId) return false;
-    if (currentStep === 5 && !wizard.step5.evaluationStrategy) return false;
-    return true;
-  };
+  const stepLabels = ['Academic Year', 'Program Group', 'Timelines', 'Strategy', 'Criteria & Tiebreakers'];
 
   return (
     <div className="page-container">
-      <div style={{ marginBottom: '8px' }}>
-        <button
-          onClick={() => router.push('/')}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--color-primary)',
-            fontSize: '14px',
-            cursor: 'pointer',
-            padding: 0,
-            fontWeight: 500,
-          }}
-        >
-          ← Back to Cycles
-        </button>
+      <div className="page-header">
+        <h1 className="page-title">Create New Cycle</h1>
+        <button className="btn-secondary" onClick={() => router.push('/')}>Cancel</button>
       </div>
 
-      <h1 className="page-title" style={{ marginBottom: '4px' }}>Create New Cycle</h1>
-      <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '0' }}>
-        Follow the steps below to set up a new admissions cycle.
-      </p>
+      {/* Progress indicator */}
+      <div className="wizard-progress">
+        {stepLabels.map((label, i) => {
+          const n = i + 1;
+          const state = n < step ? 'done' : n === step ? 'active' : 'pending';
+          return (
+            <React.Fragment key={n}>
+              <div className={`wizard-step-indicator ${state}`}>
+                <div className="step-circle">{n < step ? '✓' : n}</div>
+                <div className="step-label">{label}</div>
+              </div>
+              {i < stepLabels.length - 1 && <div className={`step-connector${n < step ? ' done' : ''}`} />}
+            </React.Fragment>
+          );
+        })}
+      </div>
 
-      <StepProgress currentStep={currentStep} />
-
+      {/* Content */}
       <div className="wizard-card">
-        <div className="wizard-body">
-          {currentStep === 1 && renderStep1()}
-          {currentStep === 2 && renderStep2()}
-          {currentStep === 3 && renderStep3()}
-          {currentStep === 4 && renderStep4()}
-          {currentStep === 5 && renderStep5()}
-        </div>
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
+        {step === 5 && renderStep5()}
 
-        <div className="wizard-footer">
-          <div>
-            {currentStep > 1 && (
-              <button className="btn-secondary" onClick={handleBack}>
-                ← Back
-              </button>
-            )}
+        {error && (
+          <div style={{ marginTop: '16px', padding: '12px 16px', background: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '8px', color: '#c53030', fontSize: '14px' }}>
+            {error}
           </div>
+        )}
 
-          <div>
-            {currentStep < 5 && (
-              <button
-                className="btn-primary"
-                onClick={currentStep === 3 ? handleContinue : handleContinue}
-                disabled={!canContinue()}
-              >
-                Continue →
-              </button>
-            )}
-            {currentStep === 5 && (
-              <button
-                className="btn-primary"
-                onClick={handleCreate}
-                disabled={!wizard.step5.evaluationStrategy || isSaving}
-              >
-                {isSaving ? 'Creating...' : 'Create Cycle'}
-              </button>
-            )}
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px' }}>
+          <button className="btn-secondary" onClick={() => setStep((s) => s - 1)} disabled={step === 1}>
+            ← Back
+          </button>
+          {step < TOTAL_STEPS ? (
+            <button className="btn-primary" onClick={() => setStep((s) => s + 1)} disabled={!stepValid()}>
+              Next →
+            </button>
+          ) : (
+            <button className="btn-primary" onClick={handleSubmit} disabled={!stepValid() || submitting}>
+              {submitting ? 'Creating…' : 'Create Cycle'}
+            </button>
+          )}
         </div>
       </div>
     </div>

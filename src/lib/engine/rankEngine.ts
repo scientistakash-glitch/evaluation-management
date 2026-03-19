@@ -5,7 +5,36 @@ import {
   createBatch,
   deleteByEvaluationAndProgram,
 } from '../data/rankRecords';
-import { EvaluationScore, RankRecord } from '@/types';
+import type { EvaluationScore, RankRecord } from '@/types';
+import type { TiebreakerRule } from '@/types/tiebreakerConfig';
+
+function getScoreForCriterion(score: EvaluationScore, criterionId: string): number {
+  if (criterionId === 'entrance') return score.entranceScore;
+  if (criterionId === 'academic') return score.academicScore;
+  if (criterionId === 'interview') return score.interviewScore;
+  return 0;
+}
+
+function compareWithTiebreakers(
+  a: EvaluationScore,
+  b: EvaluationScore,
+  rules: TiebreakerRule[]
+): number {
+  // Primary sort: compositeScore DESC
+  const compositeDiff = b.compositeScore - a.compositeScore;
+  if (Math.abs(compositeDiff) >= 0.01) return compositeDiff;
+
+  // Walk tiebreaker rules in priority order
+  for (const rule of rules) {
+    const aVal = getScoreForCriterion(a, rule.criterionId);
+    const bVal = getScoreForCriterion(b, rule.criterionId);
+    const diff = rule.direction === 'DESC' ? bVal - aVal : aVal - bVal;
+    if (Math.abs(diff) >= 0.01) return diff;
+  }
+
+  // Last resort: applicationId alphabetical (guarantees unique ranks)
+  return a.applicationId.localeCompare(b.applicationId);
+}
 
 export async function generateRankings(
   evaluationId: string,
@@ -14,7 +43,9 @@ export async function generateRankings(
   const evaluation = await getEvaluationById(evaluationId);
   if (!evaluation) throw new Error(`Evaluation ${evaluationId} not found`);
 
-  const tieBreaker = evaluation.tieBreaker; // 'entrance' | 'academic' | null
+  const tiebreakerRules: TiebreakerRule[] = (evaluation.tiebreakerRules ?? [])
+    .slice()
+    .sort((a, b) => a.order - b.order);
 
   // Get EvaluationScores for this evaluationId + programId
   const scores = await getEvaluationScoresByProgram(evaluationId, programId);
@@ -24,36 +55,18 @@ export async function generateRankings(
   const applications = await getAllApplications();
   const appMap = new Map(applications.map((a) => [a.id, a]));
 
-  // Sort by compositeScore DESC, with tiebreaker
-  const sorted = [...scores].sort((a, b) => {
-    const diff = b.compositeScore - a.compositeScore;
-    if (Math.abs(diff) >= 0.1) return diff;
+  // Sort with full tiebreaker chain — guaranteed unique order
+  const sorted = [...scores].sort((a, b) =>
+    compareWithTiebreakers(a, b, tiebreakerRules)
+  );
 
-    // Apply tiebreaker
-    if (tieBreaker === 'entrance') {
-      return b.entranceScore - a.entranceScore;
-    } else if (tieBreaker === 'academic') {
-      return b.academicScore - a.academicScore;
-    }
-    return 0;
-  });
-
-  // Detect which application IDs are involved in a tie
-  const tiedAppIds = new Set<string>();
-  for (let i = 0; i < sorted.length - 1; i++) {
-    if (Math.abs(sorted[i].compositeScore - sorted[i + 1].compositeScore) < 0.1) {
-      tiedAppIds.add(sorted[i].applicationId);
-      tiedAppIds.add(sorted[i + 1].applicationId);
-    }
-  }
-
-  // Assign globalRank: sequential (index + 1), no gaps
+  // Global rank: strictly sequential (no ties)
   const globalRankMap = new Map<string, number>();
   sorted.forEach((score, idx) => {
     globalRankMap.set(score.applicationId, idx + 1);
   });
 
-  // Group by category and assign categoryRank within each group
+  // Category rank: sequential within each category, preserving global sort order
   const categoryGroups = new Map<string, EvaluationScore[]>();
   for (const score of sorted) {
     const app = appMap.get(score.applicationId);
@@ -61,8 +74,6 @@ export async function generateRankings(
     if (!categoryGroups.has(category)) categoryGroups.set(category, []);
     categoryGroups.get(category)!.push(score);
   }
-
-  // categoryGroups are already sorted (we sorted `sorted` already, and we iterate in that order)
   const categoryRankMap = new Map<string, number>();
   Array.from(categoryGroups.values()).forEach((catScores) => {
     catScores.forEach((score, idx) => {
@@ -70,18 +81,33 @@ export async function generateRankings(
     });
   });
 
+  // Program rank: for program-wise, re-rank within this LPP scope
+  // For single strategy (programId = 'all'), programRank = globalRank
+  const programRankMap = new Map<string, number>();
+  sorted.forEach((score, idx) => {
+    programRankMap.set(score.applicationId, idx + 1);
+  });
+
+  // Determine which applicants had tiebreaker applied (composite score within 0.01 of neighbour)
+  const tiedAppIds = new Set<string>();
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (Math.abs(sorted[i].compositeScore - sorted[i + 1].compositeScore) < 0.01) {
+      tiedAppIds.add(sorted[i].applicationId);
+      tiedAppIds.add(sorted[i + 1].applicationId);
+    }
+  }
+
   // Build rank records
   const rankRecords: Omit<RankRecord, 'id' | 'createdAt' | 'updatedAt'>[] = sorted.map((score) => {
     const app = appMap.get(score.applicationId);
     const category = app?.category ?? 'General';
-    const isInTie = tiedAppIds.has(score.applicationId);
+    const tieBreakerApplied = tiedAppIds.has(score.applicationId);
 
-    let tieBreakerValue = 0;
-    let tieBreakerType = '-';
-
-    if (isInTie && tieBreaker) {
-      tieBreakerType = tieBreaker;
-      tieBreakerValue = tieBreaker === 'entrance' ? score.entranceScore : score.academicScore;
+    const tieBreakerValues: Record<string, number> = {};
+    if (tieBreakerApplied) {
+      for (const rule of tiebreakerRules) {
+        tieBreakerValues[rule.criterionId] = getScoreForCriterion(score, rule.criterionId);
+      }
     }
 
     return {
@@ -91,10 +117,11 @@ export async function generateRankings(
       programId,
       compositeScore: score.compositeScore,
       globalRank: globalRankMap.get(score.applicationId) ?? 0,
+      programRank: programRankMap.get(score.applicationId) ?? 0,
       categoryRank: categoryRankMap.get(score.applicationId) ?? 0,
       category,
-      tieBreakerValue,
-      tieBreakerType,
+      tieBreakerValues,
+      tieBreakerApplied,
     };
   });
 
