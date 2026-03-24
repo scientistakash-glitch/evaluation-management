@@ -11,6 +11,7 @@ export interface RankRecord {
   category: string;
   tieBreakerValues: Record<string, number>;  // criterionId → score used for tiebreaking
   tieBreakerApplied: boolean;
+  preferenceOrder: number;  // 1 = first choice, 2 = second choice, etc.
   createdAt: string;
   updatedAt: string;
 }

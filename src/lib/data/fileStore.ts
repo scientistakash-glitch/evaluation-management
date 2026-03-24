@@ -162,6 +162,57 @@ const SEED_READONLY: Record<string, any[]> = {
   ],
 };
 
+// ── B.Tech multi-program preferences ──────────────────────────────────────────
+// B.Tech has 4 LPPs: CSE=lpp_001, Mechanical=lpp_002, ECE=lpp_003, Civil=lpp_004
+// Each B.Tech student gets 3–4 ordered preferences from these 4 programs.
+type Pref = { lppId: string; preferenceOrder: number };
+const BTECH_PREFS: Record<string, Pref[]> = {
+  // CSE-first students
+  'app_001': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }],
+  'app_002': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }, { lppId: 'lpp_002', preferenceOrder: 4 }],
+  'app_003': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }],
+  'app_004': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
+  'app_005': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }],
+  'app_006': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }],
+  'app_007': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
+  'app_008': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }],
+  'app_009': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }],
+  'app_010': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
+  'app_011': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_004', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }],
+  // Mechanical-first students
+  'app_012': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }],
+  'app_013': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_004', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }, { lppId: 'lpp_001', preferenceOrder: 4 }],
+  'app_014': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }],
+  'app_015': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
+  'app_016': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_004', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }],
+  'app_017': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }],
+  'app_018': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_004', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }],
+  // ECE-first students
+  'app_019': [{ lppId: 'lpp_003', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }],
+  'app_020': [{ lppId: 'lpp_003', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }, { lppId: 'lpp_001', preferenceOrder: 4 }],
+  'app_021': [{ lppId: 'lpp_003', preferenceOrder: 1 }, { lppId: 'lpp_004', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }],
+  'app_022': [{ lppId: 'lpp_003', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }],
+  'app_023': [{ lppId: 'lpp_003', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
+  'app_024': [{ lppId: 'lpp_003', preferenceOrder: 1 }, { lppId: 'lpp_004', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }],
+  // Civil-first students
+  'app_025': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }],
+  'app_026': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }, { lppId: 'lpp_002', preferenceOrder: 4 }],
+  'app_027': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }],
+  'app_028': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }],
+  'app_029': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }, { lppId: 'lpp_001', preferenceOrder: 4 }],
+  'app_030': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }],
+  // Extra B.Tech students (app_077–app_080)
+  'app_077': [{ lppId: 'lpp_001', preferenceOrder: 1 }, { lppId: 'lpp_003', preferenceOrder: 2 }, { lppId: 'lpp_002', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
+  'app_078': [{ lppId: 'lpp_003', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_004', preferenceOrder: 3 }],
+  'app_079': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
+  'app_080': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }],
+};
+
+// Attach lppPreferences to all applications (B.Tech: multi-preference; others: single)
+for (const app of SEED_READONLY['applications.json']) {
+  (app as any).lppPreferences = BTECH_PREFS[app.id] ?? [{ lppId: app.lppPreference, preferenceOrder: 1 }];
+}
+
 const WRITABLE_KEYS = [
   'cycles.json',
   'evaluations.json',

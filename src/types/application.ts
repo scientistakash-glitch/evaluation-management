@@ -7,6 +7,7 @@ export interface Application {
   dateOfBirth: string;
   category: ApplicationCategory;
   lppPreference: string;
+  lppPreferences: { lppId: string; preferenceOrder: number }[];
   entranceScore: number;
   academicScore: number;
   interviewScore: number;

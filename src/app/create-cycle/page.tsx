@@ -50,8 +50,9 @@ export default function CreateCyclePage() {
   const [loadingPtats, setLoadingPtats]       = useState(false);
   const [loadingCycleNum, setLoadingCycleNum] = useState(false);
 
-  // Step 2 — Seat Matrix (read-only, fetches applications for counts)
+  // Step 2 — Seat Matrix
   const [allApplications, setAllApplications] = useState<Application[]>([]);
+  const [matrixCategory, setMatrixCategory]   = useState('All');
 
   // Step 3 — Timelines
   const [timeline, setTimeline] = useState({
@@ -62,7 +63,8 @@ export default function CreateCyclePage() {
   // Step 4 — Strategy
   const [strategy, setStrategy] = useState<'single' | 'program-wise' | null>(null);
 
-  // Step 5 — Criteria & Tiebreakers
+  // Step 5 — Criteria & Tiebreakers (sub-stepped)
+  const [subStep5, setSubStep5] = useState<'weights' | 'tiebreakers'>('weights');
   const [programConfigs, setProgramConfigs] = useState<ProgramConfig[]>([]);
   const [tiebreakerRules, setTiebreakerRules] = useState<TiebreakerRule[]>([
     { order: 0, criterionId: 'entrance', criterionName: 'Entrance Score', direction: 'DESC' },
@@ -124,8 +126,10 @@ export default function CreateCyclePage() {
   }
   function step4Valid() { return strategy !== null; }
   function step5Valid() {
-    if (tiebreakerRules.length === 0) return false;
-    return programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5);
+    if (subStep5 === 'weights') {
+      return programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5);
+    }
+    return tiebreakerRules.length > 0;
   }
 
   // ── Tiebreaker helpers ───────────────────────────────────────────────────────
@@ -279,95 +283,90 @@ export default function CreateCyclePage() {
 
   function renderStep2() {
     const isFirstCycle = cycleNumber === 1;
+    const showAll = matrixCategory === 'All';
+
+    // Per-row data depending on selected category view
+    function getRowData(lpp: LPP) {
+      const lppApps = allApplications.filter((a) => a.lppPreference === lpp.id);
+      if (showAll) {
+        // Sum across all categories
+        const totalReleased  = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).released, 0);
+        const totalAccepted  = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).accepted, 0);
+        const totalWithdrawn = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).withdrawn, 0);
+        const totalPending   = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).pending, 0);
+        return { seats: lpp.totalSeats, released: totalReleased, accepted: totalAccepted, withdrawn: totalWithdrawn, pending: totalPending, apps: lppApps.length };
+      } else {
+        const seats = lpp.categoryWiseSeats?.[matrixCategory] ?? 0;
+        const { released, accepted, withdrawn, pending } = getOfferFigures(seats, cycleNumber);
+        return { seats, released, accepted, withdrawn, pending, apps: lppApps.filter((a) => a.category === matrixCategory).length };
+      }
+    }
+
     return (
       <div className="wizard-step">
         <h2 className="step-title">Seat Matrix</h2>
         <p className="step-subtitle">
-          Review seat allocation and offer status per program and category.
-          {isFirstCycle
-            ? ' Cycle 1 — no prior offers exist.'
-            : ` Cycle ${cycleNumber} — offer figures are carried from the previous cycle.`}
+          Review seat allocation and offer status.
+          {isFirstCycle ? ' Cycle 1 — no prior offers exist.' : ` Cycle ${cycleNumber} — offer figures from previous cycle.`}
         </p>
 
-        <div style={{ overflowX: 'auto', marginTop: '8px' }}>
-          <table className="data-table" style={{ minWidth: '1100px', fontSize: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <select
+            className="form-input"
+            style={{ width: 'auto', fontSize: '13px' }}
+            value={matrixCategory}
+            onChange={(e) => setMatrixCategory(e.target.value)}
+          >
+            <option value="All">All Categories</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left' }} rowSpan={2}>Program</th>
-                {CATEGORIES.map((cat) => (
-                  <th key={cat} style={{ textAlign: 'center', borderLeft: '2px solid var(--color-border)' }} colSpan={5}>{cat}</th>
-                ))}
-                <th style={{ textAlign: 'center' }} rowSpan={2}>Total Seats</th>
-                <th style={{ textAlign: 'center' }} rowSpan={2}>Total Apps</th>
-              </tr>
-              <tr style={{ background: '#f9fafb' }}>
-                {CATEGORIES.map((cat) => (
-                  <React.Fragment key={cat}>
-                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)', borderLeft: '2px solid var(--color-border)', whiteSpace: 'nowrap' }}>Seats</th>
-                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>Released</th>
-                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#276749', whiteSpace: 'nowrap' }}>Accepted</th>
-                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#92400e', whiteSpace: 'nowrap' }}>Withdrawn</th>
-                    <th style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#1d4ed8', whiteSpace: 'nowrap' }}>Pending</th>
-                  </React.Fragment>
-                ))}
+                <th style={{ textAlign: 'left' }}>Program</th>
+                <th style={{ textAlign: 'center' }}>Seats</th>
+                <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>Released</th>
+                <th style={{ textAlign: 'center', color: '#276749' }}>Accepted</th>
+                <th style={{ textAlign: 'center', color: '#92400e' }}>Withdrawn</th>
+                <th style={{ textAlign: 'center', color: '#1d4ed8' }}>Pending</th>
+                <th style={{ textAlign: 'center' }}>Applications</th>
               </tr>
             </thead>
             <tbody>
               {ptatLpps.map((lpp) => {
-                const lppApps = allApplications.filter((a) => a.lppPreference === lpp.id);
+                const { seats, released, accepted, withdrawn, pending, apps } = getRowData(lpp);
                 return (
                   <tr key={lpp.id}>
                     <td style={{ fontWeight: 600 }}>{lpp.name}</td>
-                    {CATEGORIES.map((cat) => {
-                      const seats = lpp.categoryWiseSeats?.[cat] ?? 0;
-                      const { released, accepted, withdrawn, pending } = getOfferFigures(seats, cycleNumber);
-                      return (
-                        <React.Fragment key={cat}>
-                          <td style={{ textAlign: 'center', borderLeft: '2px solid var(--color-border)' }}>{seats}</td>
-                          <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{released}</td>
-                          <td style={{ textAlign: 'center', fontWeight: 600, color: '#276749' }}>{accepted}</td>
-                          <td style={{ textAlign: 'center', fontWeight: 600, color: '#92400e' }}>{withdrawn}</td>
-                          <td style={{ textAlign: 'center', fontWeight: 600, color: '#1d4ed8' }}>{pending}</td>
-                        </React.Fragment>
-                      );
-                    })}
-                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{lpp.totalSeats}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{lppApps.length}</td>
+                    <td style={{ textAlign: 'center' }}>{seats}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{released}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#276749' }}>{accepted}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#92400e' }}>{withdrawn}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#1d4ed8' }}>{pending}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{apps}</td>
                   </tr>
                 );
               })}
               {/* Totals row */}
               <tr style={{ borderTop: '2px solid var(--color-border)', background: 'var(--color-primary-bg)' }}>
-                <td style={{ fontWeight: 700, fontSize: '13px' }}>Total</td>
-                {CATEGORIES.map((cat) => {
-                  const totalSeats    = ptatLpps.reduce((s, l) => s + (l.categoryWiseSeats?.[cat] ?? 0), 0);
-                  const totFigures    = ptatLpps.reduce((acc, l) => {
-                    const f = getOfferFigures(l.categoryWiseSeats?.[cat] ?? 0, cycleNumber);
-                    return { released: acc.released + f.released, accepted: acc.accepted + f.accepted, withdrawn: acc.withdrawn + f.withdrawn, pending: acc.pending + f.pending };
-                  }, { released: 0, accepted: 0, withdrawn: 0, pending: 0 });
-                  return (
-                    <React.Fragment key={cat}>
-                      <td style={{ textAlign: 'center', fontWeight: 700, borderLeft: '2px solid var(--color-border)' }}>{totalSeats}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700 }}>{totFigures.released}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#276749' }}>{totFigures.accepted}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#92400e' }}>{totFigures.withdrawn}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#1d4ed8' }}>{totFigures.pending}</td>
-                    </React.Fragment>
-                  );
+                <td style={{ fontWeight: 700 }}>Total</td>
+                {['seats','released','accepted','withdrawn','pending','apps'].map((key) => {
+                  const total = ptatLpps.reduce((s, l) => s + getRowData(l)[key as keyof ReturnType<typeof getRowData>], 0);
+                  const color = key === 'accepted' ? '#276749' : key === 'withdrawn' ? '#92400e' : key === 'pending' ? '#1d4ed8' : undefined;
+                  return <td key={key} style={{ textAlign: 'center', fontWeight: 700, color }}>{total}</td>;
                 })}
-                <td style={{ textAlign: 'center', fontWeight: 700 }}>{ptatLpps.reduce((s, l) => s + l.totalSeats, 0)}</td>
-                <td style={{ textAlign: 'center', fontWeight: 700 }}>
-                  {allApplications.filter((a) => ptatLpps.some((l) => l.id === a.lppPreference)).length}
-                </td>
               </tr>
             </tbody>
           </table>
         </div>
         <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-          <span><span style={{ color: '#276749', fontWeight: 600 }}>Accepted</span> = offers accepted by applicants</span>
-          <span><span style={{ color: '#92400e', fontWeight: 600 }}>Withdrawn</span> = offers declined / withdrawn</span>
-          <span><span style={{ color: '#1d4ed8', fontWeight: 600 }}>Pending</span> = released but awaiting response</span>
-          {isFirstCycle && <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Offer columns show 0 for Cycle 1</span>}
+          <span><span style={{ color: '#276749', fontWeight: 600 }}>Accepted</span> = offers accepted</span>
+          <span><span style={{ color: '#92400e', fontWeight: 600 }}>Withdrawn</span> = offers withdrawn</span>
+          <span><span style={{ color: '#1d4ed8', fontWeight: 600 }}>Pending</span> = awaiting response</span>
+          {isFirstCycle && <span style={{ fontStyle: 'italic' }}>Offer columns show 0 for Cycle 1</span>}
         </div>
       </div>
     );
@@ -434,82 +433,109 @@ export default function CreateCyclePage() {
         <h2 className="step-title">Criteria &amp; Tiebreakers</h2>
         <p className="step-subtitle">Set evaluation weights and ranking tiebreaker priority rules.</p>
 
-        <div style={{ marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-            A — Evaluation Weights
-          </h3>
-          {programConfigs.map((pc) => {
-            const sum = weightsSum(pc.weights);
-            const sumOk = Math.abs(sum - 100) < 0.5;
+        {/* Mini sub-stepper */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0', marginBottom: '24px', padding: '12px 16px', background: 'var(--color-bg)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
+          {(['weights', 'tiebreakers'] as const).map((sub, i) => {
+            const isDone   = sub === 'weights' && subStep5 === 'tiebreakers';
+            const isActive = sub === subStep5;
+            const label    = sub === 'weights' ? 'A — Evaluation Weights' : 'B — Tiebreaker Rules';
             return (
-              <div key={pc.programId} style={{ marginBottom: '16px', padding: '16px', border: '1px solid var(--color-border)', borderRadius: '10px', background: 'white' }}>
-                {strategy === 'program-wise' && (
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '12px' }}>{pc.programName}</div>
+              <React.Fragment key={sub}>
+                {i > 0 && (
+                  <div style={{ flex: 1, height: '2px', background: isDone || subStep5 === 'tiebreakers' ? 'var(--color-primary)' : 'var(--color-border)', margin: '0 8px' }} />
                 )}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                  {(['entrance', 'academic', 'interview'] as const).map((field) => (
-                    <div key={field}>
-                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '4px' }}>
-                        {field === 'entrance' ? 'Entrance (%)' : field === 'academic' ? 'Academic (%)' : 'Interview (%)'}
-                      </label>
-                      <input type="number" min={0} max={100} step={1} className="form-input"
-                        value={pc.weights[field]}
-                        onChange={(e) => updateWeight(pc.programId, field, Number(e.target.value))} />
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ flex: 1, height: '6px', background: 'var(--color-border)', borderRadius: '3px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(sum, 100)}%`, background: sumOk ? 'var(--color-primary)' : '#e53e3e', borderRadius: '3px', transition: 'width 0.2s' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '11px', fontWeight: 700, flexShrink: 0,
+                    background: isDone ? 'var(--color-primary)' : isActive ? 'var(--color-primary)' : 'var(--color-border)',
+                    color: isDone || isActive ? 'white' : 'var(--color-text-muted)',
+                  }}>
+                    {isDone ? '✓' : (i + 1)}
                   </div>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: sumOk ? 'var(--color-primary)' : '#e53e3e', minWidth: '58px' }}>
-                    {sum}% {sumOk ? '✓' : '≠ 100'}
+                  <span style={{ fontSize: '13px', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--color-primary)' : isDone ? 'var(--color-text)' : 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                    {label}
                   </span>
                 </div>
-              </div>
+              </React.Fragment>
             );
           })}
         </div>
 
-        <div>
-          <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-            B — Tiebreaker Rules
-          </h3>
-          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '14px' }}>
-            Applied in priority order when composite scores are equal. Use ↑↓ to reorder.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {tiebreakerRules.map((rule, idx) => {
-              const usedIds = tiebreakerRules.filter((_, i) => i !== idx).map((r) => r.criterionId);
+        {subStep5 === 'weights' && (
+          <div>
+            {programConfigs.map((pc) => {
+              const sum = weightsSum(pc.weights);
+              const sumOk = Math.abs(sum - 100) < 0.5;
               return (
-                <div key={idx} className="tiebreaker-row">
-                  <span className="tiebreaker-priority">#{idx + 1}</span>
-                  <select className="form-input" style={{ flex: 1, fontSize: '13px' }}
-                    value={rule.criterionId}
-                    onChange={(e) => updateTiebreakerRule(idx, 'criterionId', e.target.value)}>
-                    {CRITERION_OPTIONS.map((opt) => (
-                      <option key={opt.id} value={opt.id} disabled={usedIds.includes(opt.id)}>{opt.label}</option>
+                <div key={pc.programId} style={{ marginBottom: '16px', padding: '16px', border: '1px solid var(--color-border)', borderRadius: '10px', background: 'white' }}>
+                  {strategy === 'program-wise' && (
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '12px' }}>{pc.programName}</div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                    {(['entrance', 'academic', 'interview'] as const).map((field) => (
+                      <div key={field}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '4px' }}>
+                          {field === 'entrance' ? 'Entrance (%)' : field === 'academic' ? 'Academic (%)' : 'Interview (%)'}
+                        </label>
+                        <input type="number" min={0} max={100} step={1} className="form-input"
+                          value={pc.weights[field]}
+                          onChange={(e) => updateWeight(pc.programId, field, Number(e.target.value))} />
+                      </div>
                     ))}
-                  </select>
-                  <select className="form-input" style={{ width: '130px', fontSize: '13px' }}
-                    value={rule.direction}
-                    onChange={(e) => updateTiebreakerRule(idx, 'direction', e.target.value)}>
-                    <option value="DESC">High → Low</option>
-                    <option value="ASC">Low → High</option>
-                  </select>
-                  <button className="icon-btn" onClick={() => moveTiebreakerRule(idx, -1)} disabled={idx === 0} title="Move up">↑</button>
-                  <button className="icon-btn" onClick={() => moveTiebreakerRule(idx, 1)} disabled={idx === tiebreakerRules.length - 1} title="Move down">↓</button>
-                  <button className="icon-btn danger" onClick={() => removeTiebreakerRule(idx)} disabled={tiebreakerRules.length === 1} title="Remove">✕</button>
+                  </div>
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ flex: 1, height: '6px', background: 'var(--color-border)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(sum, 100)}%`, background: sumOk ? 'var(--color-primary)' : '#e53e3e', borderRadius: '3px', transition: 'width 0.2s' }} />
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: sumOk ? 'var(--color-primary)' : '#e53e3e', minWidth: '58px' }}>
+                      {sum}% {sumOk ? '✓' : '≠ 100'}
+                    </span>
+                  </div>
                 </div>
               );
             })}
           </div>
-          {tiebreakerRules.length < CRITERION_OPTIONS.length && (
-            <button className="btn-secondary" style={{ marginTop: '12px', fontSize: '13px' }} onClick={addTiebreakerRule}>
-              + Add Tiebreaker Rule
-            </button>
-          )}
-        </div>
+        )}
+
+        {subStep5 === 'tiebreakers' && (
+          <div>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '14px' }}>
+              Applied in priority order when composite scores are equal. Use ↑↓ to reorder.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {tiebreakerRules.map((rule, idx) => {
+                const usedIds = tiebreakerRules.filter((_, i) => i !== idx).map((r) => r.criterionId);
+                return (
+                  <div key={idx} className="tiebreaker-row">
+                    <span className="tiebreaker-priority">#{idx + 1}</span>
+                    <select className="form-input" style={{ flex: 1, fontSize: '13px' }}
+                      value={rule.criterionId}
+                      onChange={(e) => updateTiebreakerRule(idx, 'criterionId', e.target.value)}>
+                      {CRITERION_OPTIONS.map((opt) => (
+                        <option key={opt.id} value={opt.id} disabled={usedIds.includes(opt.id)}>{opt.label}</option>
+                      ))}
+                    </select>
+                    <select className="form-input" style={{ width: '130px', fontSize: '13px' }}
+                      value={rule.direction}
+                      onChange={(e) => updateTiebreakerRule(idx, 'direction', e.target.value)}>
+                      <option value="DESC">High → Low</option>
+                      <option value="ASC">Low → High</option>
+                    </select>
+                    <button className="icon-btn" onClick={() => moveTiebreakerRule(idx, -1)} disabled={idx === 0} title="Move up">↑</button>
+                    <button className="icon-btn" onClick={() => moveTiebreakerRule(idx, 1)} disabled={idx === tiebreakerRules.length - 1} title="Move down">↓</button>
+                    <button className="icon-btn danger" onClick={() => removeTiebreakerRule(idx)} disabled={tiebreakerRules.length === 1} title="Remove">✕</button>
+                  </div>
+                );
+              })}
+            </div>
+            {tiebreakerRules.length < CRITERION_OPTIONS.length && (
+              <button className="btn-secondary" style={{ marginTop: '12px', fontSize: '13px' }} onClick={addTiebreakerRule}>
+                + Add Tiebreaker Rule
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -566,10 +592,25 @@ export default function CreateCyclePage() {
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px' }}>
-          <button className="btn-secondary" onClick={() => setStep((s) => s - 1)} disabled={step === 1}>
+          <button
+            className="btn-secondary"
+            disabled={step === 1 && subStep5 === 'weights'}
+            onClick={() => {
+              if (step === 5 && subStep5 === 'tiebreakers') {
+                setSubStep5('weights');
+              } else {
+                if (step === 5) setSubStep5('weights');
+                setStep((s) => s - 1);
+              }
+            }}
+          >
             ← Back
           </button>
-          {step < TOTAL_STEPS ? (
+          {step === 5 && subStep5 === 'weights' ? (
+            <button className="btn-primary" onClick={() => setSubStep5('tiebreakers')} disabled={!step5Valid()}>
+              Next: Tiebreakers →
+            </button>
+          ) : step < TOTAL_STEPS ? (
             <button className="btn-primary" onClick={() => setStep((s) => s + 1)} disabled={!stepValid()}>
               Next →
             </button>

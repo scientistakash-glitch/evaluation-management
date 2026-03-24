@@ -39,11 +39,14 @@ interface RankRecord {
   category: string;
   tieBreakerValues: Record<string, number>;
   tieBreakerApplied: boolean;
+  preferenceOrder: number;
 }
 
 interface Application {
   id: string; studentName: string; rollNumber: string; category: string;
   entranceScore: number; academicScore: number; interviewScore: number;
+  lppPreference: string;
+  lppPreferences?: { lppId: string; preferenceOrder: number }[];
 }
 
 const PAGE_SIZE = 15;
@@ -70,22 +73,37 @@ function tbString(r: RankRecord, tiebreakerRules: TiebreakerRule[]): string {
     .join(' › ');
 }
 
-function downloadCSV(rows: RankRecord[], appMap: Map<string, Application>, lppMap: Map<string, string>, tiebreakerRules: TiebreakerRule[]) {
-  const header = ['Global Rank', 'Global TB', 'Program Rank', 'Program TB', 'Category Rank', 'Category TB', 'Student Name', 'Roll No', 'Category', 'Program', 'Composite Score'];
+function downloadCSV(
+  students: string[],
+  appMap: Map<string, Application>,
+  lppMap: Map<string, string>,
+  studentRankMap: Map<string, Map<string, RankRecord>>,
+  programIds: string[],
+  strategy: string | null,
+) {
+  const programHeaders = strategy === 'program-wise' ? programIds.map((p) => lppMap.get(p) ?? p) : ['Global Rank', 'Category Rank'];
+  const header = ['Student Name', 'Roll No', 'Category', 'Composite Score', ...programHeaders];
   const lines = [header.join(',')];
-  for (const r of rows) {
-    const app = appMap.get(r.applicationId);
-    const programName = r.programId === 'all' ? 'All Programs' : (lppMap.get(r.programId) ?? r.programId);
-    const tb = tbString(r, tiebreakerRules);
+  for (const appId of students) {
+    const app = appMap.get(appId);
+    const ranksByProgram = studentRankMap.get(appId) ?? new Map();
+    const firstRecord = Array.from(ranksByProgram.values())[0];
+    if (!firstRecord) continue;
+    let rankCells: (string | number)[];
+    if (strategy === 'program-wise') {
+      rankCells = programIds.map((p) => {
+        const rec = ranksByProgram.get(p);
+        return rec ? rec.programRank : '—';
+      });
+    } else {
+      rankCells = [firstRecord.globalRank, firstRecord.categoryRank];
+    }
     lines.push([
-      r.globalRank, `"${tb}"`,
-      r.programRank, `"${tb}"`,
-      r.categoryRank, `"${tb}"`,
-      `"${app?.studentName ?? r.applicationId}"`,
+      `"${app?.studentName ?? appId}"`,
       app?.rollNumber ?? '',
-      r.category,
-      `"${programName}"`,
-      r.compositeScore,
+      firstRecord.category,
+      firstRecord.compositeScore,
+      ...rankCells,
     ].join(','));
   }
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -97,15 +115,12 @@ function downloadCSV(rows: RankRecord[], appMap: Map<string, Application>, lppMa
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-interface Props {
-  cycleId: string;
-}
+interface Props { cycleId: string; }
 
 export default function EvaluationWorkflow({ cycleId }: Props) {
   const router = useRouter();
   const { showToast } = useToast();
 
-  // Data loaded from sessionStorage
   const [cycle, setCycle]           = useState<Cycle | null>(null);
   const [ptat, setPtat]             = useState<PTAT | null>(null);
   const [lpps, setLpps]             = useState<LPP[]>([]);
@@ -114,26 +129,21 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   const [loaded, setLoaded]         = useState(false);
   const [loadError, setLoadError]   = useState('');
 
-  // Generation choice
   const [generationMode, setGenerationMode] = useState<'fresh' | 'previous'>('fresh');
   const [importedFromPrevious, setImportedFromPrevious] = useState(false);
 
-  // Rankings
   const [rankRecords, setRankRecords] = useState<RankRecord[]>([]);
   const [generating, setGenerating]   = useState(false);
   const [generateError, setGenerateError] = useState('');
 
-  // Approval
-  const [approved, setApproved]           = useState(false);
-  const [approving, setApproving]         = useState(false);
+  const [approved, setApproved]     = useState(false);
+  const [approving, setApproving]   = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
 
-  // Pagination + filter
-  const [page, setPage]                   = useState(1);
-  const [programFilter, setProgramFilter] = useState('all');
+  const [page, setPage]             = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('All');
 
-  // ── Load from sessionStorage ───────────────────────────────────────────────
+  // ── Load from sessionStorage ──────────────────────────────────────────────
 
   useEffect(() => {
     try {
@@ -155,7 +165,6 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
       return;
     }
 
-    // Fetch applications (always available from seed)
     fetch('/api/applications')
       .then((r) => r.json())
       .then((data) => setApplications(Array.isArray(data) ? data : []))
@@ -173,24 +182,28 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     setGenerating(true);
     setGenerateError('');
 
-    // For "previous cycle": use default weights (60/30/10) to simulate importing
     const isPrevious = generationMode === 'previous';
     showToast(isPrevious ? 'Importing previous cycle rankings…' : 'Generating scores and rankings…', 'info');
 
     try {
       const allRankRecords: RankRecord[] = [];
-
-      // Build program configs — for "previous" mode use default weights regardless of configured ones
       const configsToRun = evaluation.programConfigs.map((pc) =>
         isPrevious ? { ...pc, weights: { entrance: 60, academic: 30, interview: 10 } } : pc
       );
 
       for (const pc of configsToRun) {
-        // Step 1: Generate scores (stateless — all data in request body)
+        // Filter applications to those who listed this program as a preference
+        const programApps = pc.programId === 'all'
+          ? applications
+          : applications.filter((app) =>
+              app.lppPreferences?.some((p) => p.lppId === pc.programId)
+              ?? app.lppPreference === pc.programId
+            );
+
         const scoreRes = await fetch(`/api/evaluations/${evaluation.id}/generate-scores`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ programId: pc.programId, weights: pc.weights, applications }),
+          body: JSON.stringify({ programId: pc.programId, weights: pc.weights, applications: programApps }),
         });
         if (!scoreRes.ok) {
           const d = await scoreRes.json();
@@ -198,7 +211,6 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         }
         const scores = await scoreRes.json();
 
-        // Step 2: Generate rankings (stateless — all data in request body)
         const rankRes = await fetch(`/api/evaluations/${evaluation.id}/generate-rankings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -207,7 +219,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
             cycleId: cycle.id,
             tiebreakerRules: evaluation.tiebreakerRules,
             evaluationScores: scores,
-            applications,
+            applications: programApps,
           }),
         });
         if (!rankRes.ok) {
@@ -245,30 +257,93 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     }
   }
 
+  // ── Derived data ──────────────────────────────────────────────────────────
+
+  const tiebreakerRules = evaluation?.tiebreakerRules ?? [];
+  const isStudentCentric = evaluation?.strategy === 'program-wise' && rankRecords.length > 0;
+
+  // Unique programs in rank order
+  const uniqueProgramIds = Array.from(new Set(rankRecords.map((r) => r.programId))).filter((p) => p !== 'all');
+
+  // Student-centric grouping: Map<applicationId, Map<programId, RankRecord>>
+  const studentRankMap = new Map<string, Map<string, RankRecord>>();
+  for (const r of rankRecords) {
+    if (!studentRankMap.has(r.applicationId)) studentRankMap.set(r.applicationId, new Map());
+    studentRankMap.get(r.applicationId)!.set(r.programId, r);
+  }
+
+  const categories = ['All', ...Array.from(new Set(rankRecords.map((r) => r.category))).sort()];
+
+  // Sorted student list for student-centric view (sorted by compositeScore of first record)
+  const allStudentIds = Array.from(studentRankMap.keys());
+  const filteredStudentIds = allStudentIds
+    .filter((appId) => {
+      if (categoryFilter !== 'All') {
+        const firstRec = Array.from(studentRankMap.get(appId)?.values() ?? [])[0];
+        return firstRec?.category === categoryFilter;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const scoreA = Array.from(studentRankMap.get(a)?.values() ?? [])[0]?.compositeScore ?? 0;
+      const scoreB = Array.from(studentRankMap.get(b)?.values() ?? [])[0]?.compositeScore ?? 0;
+      return scoreB - scoreA;
+    });
+
+  // For single strategy: flat filtered records
+  const filteredSingle = rankRecords
+    .filter((r) => categoryFilter === 'All' || r.category === categoryFilter)
+    .sort((a, b) => a.globalRank - b.globalRank);
+
+  const totalPages = isStudentCentric
+    ? Math.max(1, Math.ceil(filteredStudentIds.length / PAGE_SIZE))
+    : Math.max(1, Math.ceil(filteredSingle.length / PAGE_SIZE));
+  const pageStudentIds = filteredStudentIds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageRows       = filteredSingle.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   // ── CSV ───────────────────────────────────────────────────────────────────
 
   function handleDownloadCSV() {
-    downloadCSV(filtered, appMap, lppMap, tiebreakerRules);
+    downloadCSV(filteredStudentIds, appMap, lppMap, studentRankMap, uniqueProgramIds, evaluation?.strategy ?? null);
     showToast('CSV downloaded', 'info');
   }
 
-  // ── Filtered records ──────────────────────────────────────────────────────
+  // ── Summary data ──────────────────────────────────────────────────────────
 
-  const filtered = rankRecords.filter((r) => {
-    if (programFilter !== 'all' && r.programId !== programFilter) return false;
-    if (categoryFilter !== 'All' && r.category !== categoryFilter) return false;
-    return true;
-  }).sort((a, b) => a.globalRank - b.globalRank);
+  function buildSummary() {
+    // One row per (programId, category) combination
+    const rows: { programId: string; programName: string; category: string; count: number; high: number; low: number; avg: number }[] = [];
+    type Key = string;
+    const groups = new Map<Key, RankRecord[]>();
+    for (const r of rankRecords) {
+      const key = `${r.programId}::${r.category}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
+    }
+    for (const [key, recs] of Array.from(groups.entries())) {
+      const [programId, category] = key.split('::');
+      const scores = recs.map((r) => r.compositeScore);
+      rows.push({
+        programId,
+        programName: programId === 'all' ? 'All Programs' : (lppMap.get(programId) ?? programId),
+        category,
+        count: recs.length,
+        high: Math.max(...scores),
+        low: Math.min(...scores),
+        avg: scores.reduce((s, x) => s + x, 0) / scores.length,
+      });
+    }
+    // Sort by programId order then category
+    const catOrder = ['General', 'OBC', 'SC', 'ST', 'EWS'];
+    rows.sort((a, b) => {
+      const pi = uniqueProgramIds.indexOf(a.programId) - uniqueProgramIds.indexOf(b.programId);
+      if (pi !== 0) return pi;
+      return catOrder.indexOf(a.category) - catOrder.indexOf(b.category);
+    });
+    return rows;
+  }
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageRows   = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const categories = ['All', ...Array.from(new Set(rankRecords.map((r) => r.category))).sort()];
-  const programs   = ['all', ...Array.from(new Set(rankRecords.map((r) => r.programId))).filter((p) => p !== 'all')];
-
-  const tiebreakerRules = evaluation?.tiebreakerRules ?? [];
-
-  // ── Loading / Error states ────────────────────────────────────────────────
+  // ── Loading / Error ───────────────────────────────────────────────────────
 
   if (!loaded) {
     return (
@@ -285,9 +360,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     return (
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
         <div style={{ fontSize: '32px' }}>⚠️</div>
-        <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)' }}>
-          {loadError || 'Cycle not found'}
-        </div>
+        <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)' }}>{loadError || 'Cycle not found'}</div>
         <button className="btn-primary" onClick={() => router.push('/')}>Go to Cycles</button>
       </div>
     );
@@ -300,9 +373,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
       <div className="page-container">
         <div className="page-header">
           <div>
-            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>
-              {ptat?.name} › {cycle.academicYear}
-            </div>
+            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>{ptat?.name} › {cycle.academicYear}</div>
             <h1 className="page-title" style={{ margin: 0 }}>{cycle.name}</h1>
           </div>
           <span className={`badge ${cycle.status === 'Approved' ? 'badge-maroon' : cycle.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
@@ -318,23 +389,18 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
-          {/* Weights */}
+          {/* Evaluation Criteria (no weights) */}
           <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-              Evaluation Weights
+              Evaluation Criteria
             </div>
-            {evaluation.programConfigs.map((pc) => (
-              <div key={pc.programId} style={{ marginBottom: '12px' }}>
-                {evaluation.strategy === 'program-wise' && (
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '6px' }}>{pc.programName}</div>
-                )}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <WeightPill label="Entrance" value={pc.weights.entrance} />
-                  <WeightPill label="Academic" value={pc.weights.academic} />
-                  <WeightPill label="Interview" value={pc.weights.interview} />
-                </div>
-              </div>
-            ))}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {['Entrance Score', 'Academic Score', 'Interview Score'].map((label) => (
+                <span key={label} style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '12px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', fontWeight: 600, border: '1px solid var(--color-primary)' }}>
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* Tiebreakers */}
@@ -370,36 +436,20 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
             How would you like to generate rankings?
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-            {/* Fresh option */}
-            <label
-              className={`strategy-card${generationMode === 'fresh' ? ' selected' : ''}`}
-              style={{ cursor: 'pointer', alignItems: 'flex-start' }}
-              onClick={() => setGenerationMode('fresh')}
-            >
-              <input type="radio" name="genMode" value="fresh" checked={generationMode === 'fresh'}
-                onChange={() => setGenerationMode('fresh')} style={{ marginTop: '3px', marginRight: '12px' }} />
+            <label className={`strategy-card${generationMode === 'fresh' ? ' selected' : ''}`} style={{ cursor: 'pointer', alignItems: 'flex-start' }} onClick={() => setGenerationMode('fresh')}>
+              <input type="radio" name="genMode" value="fresh" checked={generationMode === 'fresh'} onChange={() => setGenerationMode('fresh')} style={{ marginTop: '3px', marginRight: '12px' }} />
               <div>
                 <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '3px' }}>Generate Fresh Scores &amp; Rankings</div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                  Compute new composite scores from current applicant data using configured weights and tiebreaker rules.
-                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Compute new composite scores from current applicant data using configured weights and tiebreaker rules.</div>
               </div>
             </label>
 
-            {/* Previous cycle option */}
             <label
               className={`strategy-card${generationMode === 'previous' ? ' selected' : ''}`}
-              style={{
-                cursor: cycle.hasPreviousCycle ? 'pointer' : 'not-allowed',
-                alignItems: 'flex-start',
-                opacity: cycle.hasPreviousCycle ? 1 : 0.55,
-              }}
+              style={{ cursor: cycle.hasPreviousCycle ? 'pointer' : 'not-allowed', alignItems: 'flex-start', opacity: cycle.hasPreviousCycle ? 1 : 0.55 }}
               onClick={() => cycle.hasPreviousCycle && setGenerationMode('previous')}
             >
-              <input type="radio" name="genMode" value="previous" checked={generationMode === 'previous'}
-                onChange={() => cycle.hasPreviousCycle && setGenerationMode('previous')}
-                disabled={!cycle.hasPreviousCycle}
-                style={{ marginTop: '3px', marginRight: '12px' }} />
+              <input type="radio" name="genMode" value="previous" checked={generationMode === 'previous'} onChange={() => cycle.hasPreviousCycle && setGenerationMode('previous')} disabled={!cycle.hasPreviousCycle} style={{ marginTop: '3px', marginRight: '12px' }} />
               <div>
                 <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '3px' }}>
                   Use Previous Cycle Rankings
@@ -409,19 +459,12 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                  Import the ranked list from the most recent completed cycle for this program group. Preview and send directly for approval.
-                </div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Import the ranked list from the most recent completed cycle. Preview and send directly for approval.</div>
               </div>
             </label>
           </div>
 
-          <button
-            className="btn-primary"
-            onClick={handleGenerate}
-            disabled={generating}
-            style={{ padding: '12px 32px', fontSize: '15px' }}
-          >
+          <button className="btn-primary" onClick={handleGenerate} disabled={generating} style={{ padding: '12px 32px', fontSize: '15px' }}>
             {generating ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
@@ -438,121 +481,190 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
 
   // ── Render: Rankings Ready ────────────────────────────────────────────────
 
+  const summaryRows = buildSummary();
+  const tiedCount   = new Set(rankRecords.filter((r) => r.tieBreakerApplied).map((r) => r.applicationId)).size;
+
   return (
     <div className="page-container">
       <div className="page-header">
         <div>
-          <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>
-            {ptat?.name} › {cycle.academicYear}
-          </div>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>{ptat?.name} › {cycle.academicYear}</div>
           <h1 className="page-title" style={{ margin: 0 }}>{cycle.name}</h1>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span className={`badge ${approved ? 'badge-maroon' : 'badge-success'}`}>
-            {approved ? 'Approved' : 'Ranked'}
-          </span>
-          {!approved && (
-            <button className="btn-primary" onClick={() => setShowApprovalModal(true)}>
-              Send for Approval
-            </button>
-          )}
-          {approved && (
-            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-              ✓ Submitted for approval
-            </span>
-          )}
+          <span className={`badge ${approved ? 'badge-maroon' : 'badge-success'}`}>{approved ? 'Approved' : 'Ranked'}</span>
+          {!approved && <button className="btn-primary" onClick={() => setShowApprovalModal(true)}>Send for Approval</button>}
+          {approved && <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>✓ Submitted for approval</span>}
         </div>
       </div>
 
       {importedFromPrevious && (
         <div style={{ marginBottom: '20px', padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '13px', color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '16px' }}>📋</span>
-          <strong>Imported from previous cycle</strong> — Rankings are based on the most recent completed cycle for this program group. Review and send for approval.
+          <strong>Imported from previous cycle</strong> — Rankings based on the most recent completed cycle. Review and send for approval.
         </div>
       )}
 
+      {/* KPI cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <SummaryCard label="Total Applicants" value={String(new Set(rankRecords.map((r) => r.applicationId)).size)} />
-        <SummaryCard label="Programs Ranked"  value={String(programs.filter((p) => p !== 'all').length || 1)} />
-        <SummaryCard label="Strategy"         value={evaluation.strategy === 'single' ? 'Single' : 'Program-wise'} />
-        <SummaryCard label="Tiebreakers"      value={String(tiebreakerRules.length)} />
+        <SummaryCard label="Total Students" value={String(new Set(rankRecords.map((r) => r.applicationId)).size)} />
+        <SummaryCard label="Programs Ranked" value={String(uniqueProgramIds.length || 1)} />
+        <SummaryCard label="Strategy"        value={evaluation.strategy === 'single' ? 'Single' : 'Program-wise'} />
+        <SummaryCard label="Tiebreakers Applied" value={String(tiedCount)} />
       </div>
+
+      {/* Merit list summary table */}
+      {summaryRows.length > 0 && (
+        <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
+            Merit List Summary — by Program &amp; Category
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table" style={{ fontSize: '13px' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left' }}>Program</th>
+                  <th>Category</th>
+                  <th>Students Ranked</th>
+                  <th>Highest Score</th>
+                  <th>Lowest Score</th>
+                  <th>Avg Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryRows.map((row, i) => {
+                  const prevRow = summaryRows[i - 1];
+                  const isNewProgram = !prevRow || prevRow.programId !== row.programId;
+                  return (
+                    <tr key={`${row.programId}-${row.category}`} style={{ background: isNewProgram && i > 0 ? 'var(--color-bg)' : undefined }}>
+                      <td style={{ fontWeight: isNewProgram ? 700 : 400, color: isNewProgram ? 'var(--color-primary)' : 'var(--color-text-muted)', fontSize: isNewProgram ? '13px' : '12px' }}>
+                        {isNewProgram ? row.programName : ''}
+                      </td>
+                      <td><CategoryBadge category={row.category} /></td>
+                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.count}</td>
+                      <td style={{ textAlign: 'center', color: '#276749', fontWeight: 600 }}>{row.high.toFixed(2)}</td>
+                      <td style={{ textAlign: 'center', color: '#c53030' }}>{row.low.toFixed(2)}</td>
+                      <td style={{ textAlign: 'center' }}>{row.avg.toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Filters + download */}
       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {programs.length > 1 && (
-          <select className="form-input" style={{ width: 'auto', fontSize: '13px' }}
-            value={programFilter}
-            onChange={(e) => { setProgramFilter(e.target.value); setPage(1); }}>
-            <option value="all">All Programs</option>
-            {programs.filter((p) => p !== 'all').map((p) => (
-              <option key={p} value={p}>{lppMap.get(p) ?? p}</option>
-            ))}
-          </select>
-        )}
         <select className="form-input" style={{ width: 'auto', fontSize: '13px' }}
           value={categoryFilter}
           onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}>
           {categories.map((c) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
         </select>
         <span style={{ flex: 1 }} />
-        <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>
-          ↓ Download CSV
-        </button>
+        <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>↓ Download CSV</button>
       </div>
 
       {/* Rank table */}
       <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
         <div style={{ overflowX: 'auto' }}>
-          <table className="data-table" style={{ minWidth: '800px' }}>
-            <thead>
-              <tr>
-                <th>Global Rank</th>
-                <th>Program Rank</th>
-                <th>Category Rank</th>
-                <th>Student Name</th>
-                <th>Roll No</th>
-                <th>Category</th>
-                {programs.length > 1 && <th>Program</th>}
-                <th>Composite Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.length === 0 ? (
-                <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
-              ) : pageRows.map((r) => {
-                const app = appMap.get(r.applicationId);
-                const programName = r.programId === 'all' ? 'All Programs' : (lppMap.get(r.programId) ?? r.programId);
-                const tb = tbString(r, tiebreakerRules);
-                const tbBadge = tb ? (
-                  <div style={{ fontSize: '10px', color: '#b45309', marginTop: '3px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 5px', display: 'inline-block' }}>
-                    TB: {tb}
-                  </div>
-                ) : null;
-                return (
-                  <tr key={r.id}>
-                    <td>
-                      <strong style={{ color: 'var(--color-primary)' }}>#{r.globalRank}</strong>
-                      {tbBadge}
-                    </td>
-                    <td>
-                      <strong>#{r.programRank}</strong>
-                      {tbBadge}
-                    </td>
-                    <td>
-                      <strong>#{r.categoryRank}</strong>
-                      {tbBadge}
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{app?.studentName ?? r.applicationId}</td>
-                    <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{app?.rollNumber ?? '—'}</td>
-                    <td><CategoryBadge category={r.category} /></td>
-                    {programs.length > 1 && <td style={{ fontSize: '12px' }}>{programName}</td>}
-                    <td><strong>{r.compositeScore.toFixed(2)}</strong></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {isStudentCentric ? (
+            // ── Program-wise: student-centric table ─────────────────────────
+            <table className="data-table" style={{ minWidth: `${600 + uniqueProgramIds.length * 110}px` }}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Student Name</th>
+                  <th>Roll No</th>
+                  <th>Category</th>
+                  <th>Score</th>
+                  {uniqueProgramIds.map((pid) => (
+                    <th key={pid} style={{ textAlign: 'center' }}>{lppMap.get(pid) ?? pid}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageStudentIds.length === 0 ? (
+                  <tr><td colSpan={5 + uniqueProgramIds.length} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
+                ) : pageStudentIds.map((appId, rowIdx) => {
+                  const app = appMap.get(appId);
+                  const ranksByProgram = studentRankMap.get(appId) ?? new Map<string, RankRecord>();
+                  const firstRecord = Array.from(ranksByProgram.values())[0];
+                  return (
+                    <tr key={appId}>
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{(page - 1) * PAGE_SIZE + rowIdx + 1}</td>
+                      <td style={{ fontWeight: 600 }}>{app?.studentName ?? appId}</td>
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{app?.rollNumber ?? '—'}</td>
+                      <td><CategoryBadge category={firstRecord?.category ?? ''} /></td>
+                      <td><strong>{firstRecord?.compositeScore.toFixed(2) ?? '—'}</strong></td>
+                      {uniqueProgramIds.map((pid) => {
+                        const rec = ranksByProgram.get(pid);
+                        const tb  = rec ? tbString(rec, tiebreakerRules) : '';
+                        return (
+                          <td key={pid} style={{ textAlign: 'center' }}>
+                            {rec ? (
+                              <>
+                                <strong style={{ color: 'var(--color-primary)' }}>#{rec.programRank}</strong>
+                                <span style={{ marginLeft: '4px', fontSize: '10px', color: '#6b7280' }}>P{rec.preferenceOrder}</span>
+                                {tb && (
+                                  <div style={{ fontSize: '10px', color: '#b45309', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 4px', marginTop: '2px', display: 'inline-block' }}>
+                                    TB: {tb}
+                                  </div>
+                                )}
+                              </>
+                            ) : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            // ── Single strategy: flat rank table ────────────────────────────
+            <table className="data-table" style={{ minWidth: '700px' }}>
+              <thead>
+                <tr>
+                  <th>Global Rank</th>
+                  <th>Category Rank</th>
+                  <th>Student Name</th>
+                  <th>Roll No</th>
+                  <th>Category</th>
+                  <th>Composite Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.length === 0 ? (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
+                ) : pageRows.map((r) => {
+                  const app = appMap.get(r.applicationId);
+                  const tb  = tbString(r, tiebreakerRules);
+                  const tbBadge = tb ? (
+                    <div style={{ fontSize: '10px', color: '#b45309', marginTop: '3px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 5px', display: 'inline-block' }}>
+                      TB: {tb}
+                    </div>
+                  ) : null;
+                  return (
+                    <tr key={r.id}>
+                      <td>
+                        <strong style={{ color: 'var(--color-primary)' }}>#{r.globalRank}</strong>
+                        {tbBadge}
+                      </td>
+                      <td>
+                        <strong>#{r.categoryRank}</strong>
+                        {tbBadge}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{app?.studentName ?? r.applicationId}</td>
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{app?.rollNumber ?? '—'}</td>
+                      <td><CategoryBadge category={r.category} /></td>
+                      <td><strong>{r.compositeScore.toFixed(2)}</strong></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -562,7 +674,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
           <button className="page-btn" onClick={() => setPage(1)} disabled={page === 1}>«</button>
           <button className="page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
           <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', padding: '0 8px' }}>
-            Page {page} of {totalPages} ({filtered.length} records)
+            Page {page} of {totalPages} ({isStudentCentric ? filteredStudentIds.length : filteredSingle.length} records)
           </span>
           <button className="page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>›</button>
           <button className="page-btn" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</button>
@@ -574,9 +686,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         <div className="modal-overlay" onClick={() => setShowApprovalModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
             <div style={{ padding: '24px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '8px' }}>
-                Send for Approval
-              </h2>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '8px' }}>Send for Approval</h2>
               <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
                 The following stakeholders will be notified to review and approve the rankings for <strong>{cycle.name}</strong>.
               </p>
@@ -607,7 +717,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   );
 }
 
-// ── Small sub-components ───────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
@@ -615,14 +725,6 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
       <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</div>
       <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text)' }}>{value}</div>
     </div>
-  );
-}
-
-function WeightPill({ label, value }: { label: string; value: number }) {
-  return (
-    <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', fontWeight: 600, border: '1px solid var(--color-primary)' }}>
-      {label}: {value}%
-    </span>
   );
 }
 

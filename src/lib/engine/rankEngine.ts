@@ -13,6 +13,8 @@ interface EvaluationScoreInput {
 interface ApplicationInput {
   id: string;
   category: string;
+  lppPreference?: string;
+  lppPreferences?: { lppId: string; preferenceOrder: number }[];
 }
 
 function getScoreForCriterion(score: EvaluationScoreInput, criterionId: string): number {
@@ -99,6 +101,10 @@ export function computeRankings(
       }
     }
 
+    const app = appMap.get(score.applicationId);
+    const prefEntry = app?.lppPreferences?.find((p) => p.lppId === programId);
+    const preferenceOrder = prefEntry?.preferenceOrder ?? 1;
+
     return {
       id: `rr_${evaluationId}_${score.applicationId}_${programId}`,
       evaluationId,
@@ -112,6 +118,7 @@ export function computeRankings(
       category,
       tieBreakerValues,
       tieBreakerApplied,
+      preferenceOrder,
     };
   });
 }
