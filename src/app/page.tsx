@@ -57,6 +57,7 @@ export default function CyclesPage() {
   const [ptats, setPtats]     = useState<PTAT[]>([]);
   const [lpps, setLpps]       = useState<LPP[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [offerOverrides, setOfferOverrides] = useState<Record<string, { released: number; accepted: number; pending: number; withdrawn: number }>>({});
 
   useEffect(() => {
     async function load() {
@@ -76,6 +77,18 @@ export default function CyclesPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (cycles.length === 0) return;
+    const overrides: Record<string, { released: number; accepted: number; pending: number; withdrawn: number }> = {};
+    for (const cycle of cycles) {
+      try {
+        const stored = sessionStorage.getItem(`cycle-${cycle.id}-offers`);
+        if (stored) overrides[cycle.id] = JSON.parse(stored);
+      } catch { /* ignore */ }
+    }
+    setOfferOverrides(overrides);
+  }, [cycles]);
 
   const ptatMap = new Map(ptats.map((p) => [p.id, p]));
   const lppTotalSeats = new Map(lpps.map((l) => [l.id, l.totalSeats]));
@@ -126,7 +139,7 @@ export default function CyclesPage() {
                 {cycles.map((cycle) => {
                   const ptat = ptatMap.get(cycle.ptatId);
                   const totalSeats = (cycle.lppIds ?? []).reduce((s, id) => s + (lppTotalSeats.get(id) ?? 0), 0);
-                  const offers = getOfferFigures(totalSeats, cycle.number);
+                  const offers = offerOverrides[cycle.id] ?? getOfferFigures(totalSeats, cycle.number);
                   return (
                     <tr
                       key={cycle.id}

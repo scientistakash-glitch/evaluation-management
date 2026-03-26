@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/common/ToastContext';
+import BulkOfferRelease from './BulkOfferRelease';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ interface Cycle {
 
 interface PTAT { id: string; name: string; }
 interface LPP  { id: string; name: string; }
+interface FullLPP { id: string; name: string; totalSeats: number; categoryWiseSeats: Record<string, number>; }
 
 interface TiebreakerRule { order: number; criterionId: string; criterionName: string; direction: 'DESC' | 'ASC'; }
 interface ProgramWeights { entrance: number; academic: number; interview: number; }
@@ -113,6 +115,31 @@ function downloadCSV(
   URL.revokeObjectURL(url);
 }
 
+// ── Stepper ───────────────────────────────────────────────────────────────────
+
+function WizardStepper({ activeStep, generationMode }: { activeStep: number; generationMode: 'fresh' | 'previous' }) {
+  const labels = generationMode === 'previous'
+    ? ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Approval']
+    : ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Approval'];
+  return (
+    <div className="wizard-progress">
+      {labels.map((label, i) => {
+        const n = i + 1;
+        const state = n < activeStep ? 'done' : n === activeStep ? 'active' : 'pending';
+        return (
+          <React.Fragment key={n}>
+            <div className={`wizard-step-indicator ${state}`}>
+              <div className="step-circle">{n < activeStep ? '✓' : n}</div>
+              <div className="step-label">{label}</div>
+            </div>
+            {i < labels.length - 1 && <div className={`step-connector${n < activeStep ? ' done' : ''}`} />}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 interface Props { cycleId: string; }
@@ -124,24 +151,22 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   const [cycle, setCycle]           = useState<Cycle | null>(null);
   const [ptat, setPtat]             = useState<PTAT | null>(null);
   const [lpps, setLpps]             = useState<LPP[]>([]);
+  const [fullLpps, setFullLpps]     = useState<FullLPP[]>([]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loaded, setLoaded]         = useState(false);
   const [loadError, setLoadError]   = useState('');
 
   const [generationMode, setGenerationMode] = useState<'fresh' | 'previous'>('fresh');
-  const [importedFromPrevious, setImportedFromPrevious] = useState(false);
 
   const [rankRecords, setRankRecords] = useState<RankRecord[]>([]);
-  const [generating, setGenerating]   = useState(false);
-  const [generateError, setGenerateError] = useState('');
 
   const [approved, setApproved]     = useState(false);
   const [approving, setApproving]   = useState(false);
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   const [page, setPage]             = useState(1);
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [evalStep, setEvalStep]     = useState<'scores' | 'offers' | 'approval'>('scores');
 
   // ── Load from sessionStorage ──────────────────────────────────────────────
 
@@ -158,7 +183,10 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
       setEvaluation(parsed.evaluation);
       setPtat(parsed.ptat ?? null);
       setLpps(parsed.lpps ?? []);
+      setFullLpps(parsed.lpps ?? []);
+      setGenerationMode(parsed.generationMode ?? 'fresh');
       setApproved(parsed.evaluation?.status === 'Approved');
+      if (Array.isArray(parsed.rankRecords)) setRankRecords(parsed.rankRecords);
     } catch {
       setLoadError('Failed to load cycle data.');
       setLoaded(true);
@@ -175,74 +203,6 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   const appMap = new Map(applications.map((a) => [a.id, a]));
   const lppMap = new Map(lpps.map((l) => [l.id, l.name]));
 
-  // ── Generate ──────────────────────────────────────────────────────────────
-
-  async function handleGenerate() {
-    if (!evaluation || !cycle) return;
-    setGenerating(true);
-    setGenerateError('');
-
-    const isPrevious = generationMode === 'previous';
-    showToast(isPrevious ? 'Importing previous cycle rankings…' : 'Generating scores and rankings…', 'info');
-
-    try {
-      const allRankRecords: RankRecord[] = [];
-      const configsToRun = evaluation.programConfigs.map((pc) =>
-        isPrevious ? { ...pc, weights: { entrance: 60, academic: 30, interview: 10 } } : pc
-      );
-
-      for (const pc of configsToRun) {
-        // Filter applications to those who listed this program as a preference
-        const programApps = pc.programId === 'all'
-          ? applications
-          : applications.filter((app) =>
-              app.lppPreferences?.some((p) => p.lppId === pc.programId)
-              ?? app.lppPreference === pc.programId
-            );
-
-        const scoreRes = await fetch(`/api/evaluations/${evaluation.id}/generate-scores`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ programId: pc.programId, weights: pc.weights, applications: programApps }),
-        });
-        if (!scoreRes.ok) {
-          const d = await scoreRes.json();
-          throw new Error(d.error ?? 'Score generation failed');
-        }
-        const scores = await scoreRes.json();
-
-        const rankRes = await fetch(`/api/evaluations/${evaluation.id}/generate-rankings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            programId: pc.programId,
-            cycleId: cycle.id,
-            tiebreakerRules: evaluation.tiebreakerRules,
-            evaluationScores: scores,
-            applications: programApps,
-          }),
-        });
-        if (!rankRes.ok) {
-          const d = await rankRes.json();
-          throw new Error(d.error ?? 'Ranking generation failed');
-        }
-        const rankings = await rankRes.json();
-        allRankRecords.push(...(Array.isArray(rankings) ? rankings : []));
-      }
-
-      setEvaluation((prev) => prev ? { ...prev, ranksGenerated: true, status: 'Ranked' } : prev);
-      setRankRecords(allRankRecords);
-      if (isPrevious) setImportedFromPrevious(true);
-      showToast(isPrevious ? 'Previous cycle rankings imported' : 'Rankings generated successfully', 'success');
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to generate';
-      setGenerateError(msg);
-      showToast(msg, 'error');
-    } finally {
-      setGenerating(false);
-    }
-  }
-
   // ── Approve ───────────────────────────────────────────────────────────────
 
   async function handleApprove() {
@@ -250,7 +210,6 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     try {
       setApproved(true);
       setEvaluation((prev) => prev ? { ...prev, status: 'Approved' } : prev);
-      setShowApprovalModal(false);
       showToast('Sent for approval successfully', 'success');
     } finally {
       setApproving(false);
@@ -260,10 +219,10 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const tiebreakerRules = evaluation?.tiebreakerRules ?? [];
-  const isStudentCentric = evaluation?.strategy === 'program-wise' && rankRecords.length > 0;
 
   // Unique programs in rank order
   const uniqueProgramIds = Array.from(new Set(rankRecords.map((r) => r.programId))).filter((p) => p !== 'all');
+  const isStudentCentric = uniqueProgramIds.length > 0 && rankRecords.length > 0;
 
   // Student-centric grouping: Map<applicationId, Map<programId, RankRecord>>
   const studentRankMap = new Map<string, Map<string, RankRecord>>();
@@ -368,124 +327,23 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
 
   // ── Render: Not Generated ─────────────────────────────────────────────────
 
-  if (!evaluation.ranksGenerated) {
-    return (
-      <div className="page-container">
-        <div className="page-header">
-          <div>
-            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>{ptat?.name} › {cycle.academicYear}</div>
-            <h1 className="page-title" style={{ margin: 0 }}>{cycle.name}</h1>
-          </div>
-          <span className={`badge ${cycle.status === 'Approved' ? 'badge-maroon' : cycle.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
-            {cycle.status}
-          </span>
-        </div>
+  // Stepper step: pre-gen = Score & Offers step; post-gen depends on approval state
+  const scoreStep = generationMode === 'previous' ? 5 : 6;
+  const approvalStep = generationMode === 'previous' ? 6 : 7;
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-          <SummaryCard label="Strategy" value={evaluation.strategy === 'single' ? 'Single Evaluation' : evaluation.strategy === 'program-wise' ? 'Program-wise' : '—'} />
-          <SummaryCard label="Start Date"   value={formatDate(cycle.timeline.startDate)} />
-          <SummaryCard label="Closing Date" value={formatDate(cycle.timeline.closingDate)} />
-          <SummaryCard label="Programs"     value={String(lpps.length)} />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '28px' }}>
-          {/* Evaluation Criteria (no weights) */}
-          <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-              Evaluation Criteria
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['Entrance Score', 'Academic Score', 'Interview Score'].map((label) => (
-                <span key={label} style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '12px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', fontWeight: 600, border: '1px solid var(--color-primary)' }}>
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Tiebreakers */}
-          <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-              Tiebreaker Rules
-            </div>
-            {tiebreakerRules.length === 0 ? (
-              <div style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>No rules configured</div>
-            ) : (
-              tiebreakerRules.map((rule, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '13px' }}>
-                  <span style={{ background: 'var(--color-primary)', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
-                    {i + 1}
-                  </span>
-                  <span style={{ fontWeight: 600 }}>{rule.criterionName}</span>
-                  <span style={{ color: 'var(--color-text-muted)' }}>{rule.direction === 'DESC' ? 'High → Low' : 'Low → High'}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {generateError && (
-          <div style={{ marginBottom: '16px', padding: '12px 16px', background: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '8px', color: '#c53030', fontSize: '14px' }}>
-            {generateError}
-          </div>
-        )}
-
-        {/* Generation choice */}
-        <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '14px', padding: '28px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '18px' }}>
-            How would you like to generate rankings?
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-            <label className={`strategy-card${generationMode === 'fresh' ? ' selected' : ''}`} style={{ cursor: 'pointer', alignItems: 'flex-start' }} onClick={() => setGenerationMode('fresh')}>
-              <input type="radio" name="genMode" value="fresh" checked={generationMode === 'fresh'} onChange={() => setGenerationMode('fresh')} style={{ marginTop: '3px', marginRight: '12px' }} />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '3px' }}>Generate Fresh Scores &amp; Rankings</div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Compute new composite scores from current applicant data using configured weights and tiebreaker rules.</div>
-              </div>
-            </label>
-
-            <label
-              className={`strategy-card${generationMode === 'previous' ? ' selected' : ''}`}
-              style={{ cursor: cycle.hasPreviousCycle ? 'pointer' : 'not-allowed', alignItems: 'flex-start', opacity: cycle.hasPreviousCycle ? 1 : 0.55 }}
-              onClick={() => cycle.hasPreviousCycle && setGenerationMode('previous')}
-            >
-              <input type="radio" name="genMode" value="previous" checked={generationMode === 'previous'} onChange={() => cycle.hasPreviousCycle && setGenerationMode('previous')} disabled={!cycle.hasPreviousCycle} style={{ marginTop: '3px', marginRight: '12px' }} />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '3px' }}>
-                  Use Previous Cycle Rankings
-                  {!cycle.hasPreviousCycle && (
-                    <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: 500, color: 'var(--color-text-muted)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1px 6px' }}>
-                      No previous cycle
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Import the ranked list from the most recent completed cycle. Preview and send directly for approval.</div>
-              </div>
-            </label>
-          </div>
-
-          <button className="btn-primary" onClick={handleGenerate} disabled={generating} style={{ padding: '12px 32px', fontSize: '15px' }}>
-            {generating ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} />
-                {generationMode === 'previous' ? 'Importing…' : 'Generating…'}
-              </span>
-            ) : (
-              generationMode === 'previous' ? 'Import Previous Rankings →' : 'Generate Scores & Rankings →'
-            )}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Render: Rankings Ready ────────────────────────────────────────────────
+  // ── Render: Rankings ─────────────────────────────────────────────────────
 
   const summaryRows = buildSummary();
   const tiedCount   = new Set(rankRecords.filter((r) => r.tieBreakerApplied).map((r) => r.applicationId)).size;
 
+  // Compute active stepper step: scores=scoreStep, offers=scoreStep+1, approval=scoreStep+2
+  const activeStepNum = evalStep === 'scores' ? scoreStep
+    : evalStep === 'offers' ? scoreStep + 1
+    : approved ? scoreStep + 3 : scoreStep + 2;
+
   return (
     <div className="page-container">
+      <WizardStepper activeStep={activeStepNum} generationMode={generationMode} />
       <div className="page-header">
         <div>
           <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '4px' }}>{ptat?.name} › {cycle.academicYear}</div>
@@ -493,15 +351,16 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span className={`badge ${approved ? 'badge-maroon' : 'badge-success'}`}>{approved ? 'Approved' : 'Ranked'}</span>
-          {!approved && <button className="btn-primary" onClick={() => setShowApprovalModal(true)}>Send for Approval</button>}
-          {approved && <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>✓ Submitted for approval</span>}
+          <span className="badge badge-default" style={{ fontSize: '11px' }}>{generationMode === 'previous' ? 'Previous Import' : 'Fresh'}</span>
         </div>
       </div>
 
-      {importedFromPrevious && (
+      {/* ════════════ STEP 6: Scores & Merit List ════════════ */}
+      {evalStep === 'scores' && <>
+      {generationMode === 'previous' && (
         <div style={{ marginBottom: '20px', padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '13px', color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '16px' }}>📋</span>
-          <strong>Imported from previous cycle</strong> — Rankings based on the most recent completed cycle. Review and send for approval.
+          <strong>Imported from previous cycle</strong> — Rankings based on the most recent completed cycle.
         </div>
       )}
 
@@ -513,7 +372,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         <SummaryCard label="Tiebreakers Applied" value={String(tiedCount)} />
       </div>
 
-      {/* Merit list summary table */}
+      {/* Merit list summary — always program × category */}
       {summaryRows.length > 0 && (
         <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
           <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
@@ -554,66 +413,65 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         </div>
       )}
 
-      {/* Filters + download */}
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <select className="form-input" style={{ width: 'auto', fontSize: '13px' }}
-          value={categoryFilter}
-          onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}>
-          {categories.map((c) => <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>)}
-        </select>
-        <span style={{ flex: 1 }} />
-        <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>↓ Download CSV</button>
+      {/* Download */}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', justifyContent: 'flex-end' }}>
+        <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>↓ Download Full CSV</button>
       </div>
 
-      {/* Rank table */}
+      {/* Rank table — student-centric with global, category, and per-program ranks */}
       <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
         <div style={{ overflowX: 'auto' }}>
           {isStudentCentric ? (
-            // ── Program-wise: student-centric table ─────────────────────────
-            <table className="data-table" style={{ minWidth: `${600 + uniqueProgramIds.length * 110}px` }}>
+            <table className="data-table" style={{ minWidth: `${700 + uniqueProgramIds.length * 180}px` }}>
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>Global Rank</th>
+                  <th>App ID</th>
                   <th>Student Name</th>
-                  <th>Roll No</th>
                   <th>Category</th>
+                  <th>Cat. Rank</th>
                   <th>Score</th>
-                  {uniqueProgramIds.map((pid) => (
-                    <th key={pid} style={{ textAlign: 'center' }}>{lppMap.get(pid) ?? pid}</th>
-                  ))}
+                  {uniqueProgramIds.map((pid) => {
+                    const shortName = (lppMap.get(pid) ?? pid).replace('B.Tech ', '');
+                    return (
+                      <React.Fragment key={pid}>
+                        <th style={{ textAlign: 'center' }}>{shortName} Rank</th>
+                        <th style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)' }}>{shortName} TB</th>
+                      </React.Fragment>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {pageStudentIds.length === 0 ? (
-                  <tr><td colSpan={5 + uniqueProgramIds.length} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
-                ) : pageStudentIds.map((appId, rowIdx) => {
+                {filteredStudentIds.length === 0 ? (
+                  <tr><td colSpan={6 + uniqueProgramIds.length * 2} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
+                ) : filteredStudentIds.slice(0, 10).map((appId, rowIdx) => {
                   const app = appMap.get(appId);
                   const ranksByProgram = studentRankMap.get(appId) ?? new Map<string, RankRecord>();
                   const firstRecord = Array.from(ranksByProgram.values())[0];
+                  const globalR = firstRecord?.globalRank ?? 0;
+                  const catR = firstRecord?.categoryRank ?? 0;
+                  const globalTb = firstRecord ? tbString(firstRecord, tiebreakerRules) : '';
                   return (
                     <tr key={appId}>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{(page - 1) * PAGE_SIZE + rowIdx + 1}</td>
+                      <td><strong style={{ color: 'var(--color-primary)' }}>#{globalR}</strong></td>
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{appId}</td>
                       <td style={{ fontWeight: 600 }}>{app?.studentName ?? appId}</td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{app?.rollNumber ?? '—'}</td>
                       <td><CategoryBadge category={firstRecord?.category ?? ''} /></td>
+                      <td><strong>#{catR}</strong></td>
                       <td><strong>{firstRecord?.compositeScore.toFixed(2) ?? '—'}</strong></td>
                       {uniqueProgramIds.map((pid) => {
                         const rec = ranksByProgram.get(pid);
                         const tb  = rec ? tbString(rec, tiebreakerRules) : '';
                         return (
-                          <td key={pid} style={{ textAlign: 'center' }}>
-                            {rec ? (
-                              <>
-                                <strong style={{ color: 'var(--color-primary)' }}>#{rec.programRank}</strong>
-                                <span style={{ marginLeft: '4px', fontSize: '10px', color: '#6b7280' }}>P{rec.preferenceOrder}</span>
-                                {tb && (
-                                  <div style={{ fontSize: '10px', color: '#b45309', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 4px', marginTop: '2px', display: 'inline-block' }}>
-                                    TB: {tb}
-                                  </div>
-                                )}
-                              </>
-                            ) : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
-                          </td>
+                          <React.Fragment key={pid}>
+                            <td style={{ textAlign: 'center' }}>
+                              {rec ? <strong style={{ color: 'var(--color-primary)' }}>#{rec.programRank}</strong> : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
+                            </td>
+                            <td style={{ textAlign: 'center', fontSize: '11px', color: '#b45309' }}>
+                              {tb || ''}
+                            </td>
+                          </React.Fragment>
                         );
                       })}
                     </tr>
@@ -622,29 +480,24 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
               </tbody>
             </table>
           ) : (
-            // ── Single strategy: flat rank table ────────────────────────────
             <table className="data-table" style={{ minWidth: '700px' }}>
               <thead>
                 <tr>
                   <th>Global Rank</th>
                   <th>Category Rank</th>
+                  <th>Application ID</th>
                   <th>Student Name</th>
-                  <th>Roll No</th>
                   <th>Category</th>
                   <th>Composite Score</th>
                 </tr>
               </thead>
               <tbody>
-                {pageRows.length === 0 ? (
+                {filteredSingle.length === 0 ? (
                   <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
-                ) : pageRows.map((r) => {
+                ) : filteredSingle.slice(0, 10).map((r) => {
                   const app = appMap.get(r.applicationId);
                   const tb  = tbString(r, tiebreakerRules);
-                  const tbBadge = tb ? (
-                    <div style={{ fontSize: '10px', color: '#b45309', marginTop: '3px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 5px', display: 'inline-block' }}>
-                      TB: {tb}
-                    </div>
-                  ) : null;
+                  const tbBadge = tb ? <div style={{ fontSize: '10px', color: '#b45309', marginTop: '3px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 5px', display: 'inline-block' }}>TB</div> : null;
                   return (
                     <tr key={r.id}>
                       <td>
@@ -655,8 +508,8 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
                         <strong>#{r.categoryRank}</strong>
                         {tbBadge}
                       </td>
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{r.applicationId}</td>
                       <td style={{ fontWeight: 600 }}>{app?.studentName ?? r.applicationId}</td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{app?.rollNumber ?? '—'}</td>
                       <td><CategoryBadge category={r.category} /></td>
                       <td><strong>{r.compositeScore.toFixed(2)}</strong></td>
                     </tr>
@@ -668,29 +521,51 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         </div>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          <button className="page-btn" onClick={() => setPage(1)} disabled={page === 1}>«</button>
-          <button className="page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
-          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', padding: '0 8px' }}>
-            Page {page} of {totalPages} ({isStudentCentric ? filteredStudentIds.length : filteredSingle.length} records)
-          </span>
-          <button className="page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>›</button>
-          <button className="page-btn" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</button>
-        </div>
-      )}
+      {/* Sample note */}
+      <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
+        Showing top 10 of {isStudentCentric ? filteredStudentIds.length : filteredSingle.length} students. Download CSV for complete data.
+      </div>
 
-      {/* Approval Modal */}
-      {showApprovalModal && (
-        <div className="modal-overlay" onClick={() => setShowApprovalModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px' }}>
-            <div style={{ padding: '24px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '8px' }}>Send for Approval</h2>
-              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '20px' }}>
-                The following stakeholders will be notified to review and approve the rankings for <strong>{cycle.name}</strong>.
+      {/* Navigation: Next to Bulk Offers */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+        <button className="btn-primary" onClick={() => setEvalStep('offers')}>Next: Bulk Offer Release →</button>
+      </div>
+      </>}
+
+      {/* ════════════ STEP 7: Bulk Offer Release ════════════ */}
+      {evalStep === 'offers' && <>
+        <BulkOfferRelease
+          cycleId={cycle.id}
+          strategy={evaluation.strategy}
+          fullLpps={fullLpps}
+          rankRecords={rankRecords}
+          applications={applications}
+          studentRankMap={studentRankMap}
+          uniqueProgramIds={uniqueProgramIds}
+          lppMap={lppMap}
+          appMap={appMap}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+          <button className="btn-secondary" onClick={() => setEvalStep('scores')}>← Back to Merit List</button>
+          {generationMode === 'fresh' && <button className="btn-primary" onClick={() => setEvalStep('approval')}>Next: Approval →</button>}
+        </div>
+      </>}
+
+      {/* ════════════ STEP 8: Approval ════════════ */}
+      {evalStep === 'approval' && generationMode === 'fresh' && <>
+        <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px' }}>Send for Approval</div>
+          {approved ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#276749', fontSize: '14px' }}>
+              <span style={{ fontSize: '18px' }}>✓</span>
+              <strong>Submitted for approval</strong>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
+                The following stakeholders will be notified to review and approve the rankings and offer allocations for <strong>{cycle.name}</strong>.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
                 {HARDCODED_APPROVERS.map((a) => (
                   <div key={a.email} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: '8px', background: 'var(--color-bg)' }}>
                     <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '14px', flexShrink: 0 }}>
@@ -703,16 +578,18 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button className="btn-secondary" onClick={() => setShowApprovalModal(false)}>Cancel</button>
-                <button className="btn-primary" onClick={handleApprove} disabled={approving}>
-                  {approving ? 'Sending…' : 'Send for Approval'}
-                </button>
-              </div>
-            </div>
-          </div>
+              <button className="btn-primary" onClick={handleApprove} disabled={approving}>
+                {approving ? 'Sending…' : 'Send for Approval'}
+              </button>
+            </>
+          )}
         </div>
-      )}
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '24px' }}>
+          <button className="btn-secondary" onClick={() => setEvalStep('offers')}>← Back to Bulk Offers</button>
+        </div>
+      </>}
+
+      {/* Modal removed — approval is now inline in step 8 */}
     </div>
   );
 }

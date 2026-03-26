@@ -39,7 +39,6 @@ export default function CreateCyclePage() {
   const { showToast } = useToast();
 
   const [step, setStep] = useState(1);
-  const TOTAL_STEPS = 5;
 
   // Step 1 — Academic Year + Program Group
   const [academicYear, setAcademicYear]       = useState('');
@@ -52,7 +51,6 @@ export default function CreateCyclePage() {
 
   // Step 2 — Seat Matrix
   const [allApplications, setAllApplications] = useState<Application[]>([]);
-  const [matrixCategory, setMatrixCategory]   = useState('All');
 
   // Step 3 — Timelines
   const [timeline, setTimeline] = useState({
@@ -60,8 +58,10 @@ export default function CreateCyclePage() {
     paymentDeadline: '', closingDate: '',
   });
 
-  // Step 4 — Strategy
+  // Step 4 — Strategy + Generation Mode
   const [strategy, setStrategy] = useState<'single' | 'program-wise' | null>(null);
+  const [generationMode, setGenerationMode] = useState<'fresh' | 'previous'>('fresh');
+  const totalSteps = generationMode === 'previous' ? 4 : 5;
 
   // Step 5 — Criteria & Tiebreakers (sub-stepped)
   const [subStep5, setSubStep5] = useState<'weights' | 'tiebreakers'>('weights');
@@ -72,6 +72,7 @@ export default function CreateCyclePage() {
 
   // Submission
   const [submitting, setSubmitting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError]           = useState('');
 
   // Load PTATs once
@@ -188,7 +189,14 @@ export default function CreateCyclePage() {
           ptatName: selectedPtatObj?.name ?? selectedPtatId,
           lppIds, timeline,
           evaluationStrategy: strategy,
-          programConfigs, tiebreakerRules,
+          programConfigs: generationMode === 'previous'
+            ? (strategy === 'single'
+                ? [{ programId: 'all', programName: 'All Programs', weights: { entrance: 60, academic: 30, interview: 10 }, scoresGenerated: false }]
+                : lpps.filter((l) => l.ptatId === selectedPtatId).map((l) => ({ programId: l.id, programName: l.name, weights: { entrance: 60, academic: 30, interview: 10 }, scoresGenerated: false })))
+            : programConfigs,
+          tiebreakerRules: generationMode === 'previous'
+            ? [{ order: 0, criterionId: 'entrance', criterionName: 'Entrance Score', direction: 'DESC' }]
+            : tiebreakerRules,
         }),
       });
 
@@ -201,11 +209,73 @@ export default function CreateCyclePage() {
       }
 
       const { cycle, evaluation } = await res.json();
-      sessionStorage.setItem(`cycle-${cycle.id}`, JSON.stringify({ cycle, evaluation, ptat: selectedPtatObj, lpps: ptatLpps }));
+      sessionStorage.setItem(`cycle-${cycle.id}`, JSON.stringify({ cycle, evaluation, ptat: selectedPtatObj, lpps: ptatLpps, generationMode }));
       showToast(`${cycle.name} created`, 'success');
+
+      // Phase 2 — Generate rankings inline
+      setSubmitting(false);
+      setGenerating(true);
+      showToast(generationMode === 'previous' ? 'Importing previous cycle rankings…' : 'Generating scores and rankings…', 'info');
+
+      const appsRes = await fetch('/api/applications');
+      const allApps = appsRes.ok ? await appsRes.json() : [];
+
+      let configsToRun = evaluation.programConfigs.map((pc: ProgramConfig) =>
+        generationMode === 'previous' ? { ...pc, weights: { entrance: 60, academic: 30, interview: 10 } } : pc
+      );
+
+      // Expand single-strategy 'all' config into per-LPP configs
+      if (configsToRun.length === 1 && configsToRun[0].programId === 'all' && ptatLpps.length > 1) {
+        const w = configsToRun[0].weights;
+        configsToRun = ptatLpps.map((l: LPP) => ({
+          programId: l.id, programName: l.name, weights: { ...w }, scoresGenerated: false,
+        }));
+      }
+
+      const allRankRecords: unknown[] = [];
+      for (const pc of configsToRun) {
+        const programApps = pc.programId === 'all'
+          ? allApps
+          : allApps.filter((app: { lppPreferences?: { lppId: string }[]; lppPreference: string }) =>
+              app.lppPreferences?.some((p: { lppId: string }) => p.lppId === pc.programId) ?? app.lppPreference === pc.programId
+            );
+
+        const scoreRes = await fetch(`/api/evaluations/${evaluation.id}/generate-scores`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ programId: pc.programId, weights: pc.weights, applications: programApps }),
+        });
+        if (!scoreRes.ok) throw new Error('Score generation failed');
+        const scores = await scoreRes.json();
+
+        const rankRes = await fetch(`/api/evaluations/${evaluation.id}/generate-rankings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            programId: pc.programId, cycleId: cycle.id,
+            tiebreakerRules: evaluation.tiebreakerRules,
+            evaluationScores: scores, applications: programApps,
+          }),
+        });
+        if (!rankRes.ok) throw new Error('Ranking generation failed');
+        const rankings = await rankRes.json();
+        allRankRecords.push(...(Array.isArray(rankings) ? rankings : []));
+      }
+
+      // Persist ranks to sessionStorage so evaluation page loads them directly
+      const updatedEval = { ...evaluation, ranksGenerated: true, status: 'Ranked' };
+      sessionStorage.setItem(`cycle-${cycle.id}`, JSON.stringify({
+        cycle, evaluation: updatedEval, ptat: selectedPtatObj, lpps: ptatLpps, generationMode, rankRecords: allRankRecords,
+      }));
+      showToast(generationMode === 'previous' ? 'Rankings imported successfully' : 'Rankings generated successfully', 'success');
       router.push(`/cycle/${cycle.id}/evaluation`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed';
+      setError(msg);
+      showToast(msg, 'error');
     } finally {
       setSubmitting(false);
+      setGenerating(false);
     }
   }
 
@@ -283,23 +353,22 @@ export default function CreateCyclePage() {
 
   function renderStep2() {
     const isFirstCycle = cycleNumber === 1;
-    const showAll = matrixCategory === 'All';
 
-    // Per-row data depending on selected category view
-    function getRowData(lpp: LPP) {
-      const lppApps = allApplications.filter((a) => a.lppPreference === lpp.id);
-      if (showAll) {
-        // Sum across all categories
-        const totalReleased  = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).released, 0);
-        const totalAccepted  = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).accepted, 0);
-        const totalWithdrawn = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).withdrawn, 0);
-        const totalPending   = CATEGORIES.reduce((s, c) => s + getOfferFigures(lpp.categoryWiseSeats?.[c] ?? 0, cycleNumber).pending, 0);
-        return { seats: lpp.totalSeats, released: totalReleased, accepted: totalAccepted, withdrawn: totalWithdrawn, pending: totalPending, apps: lppApps.length };
-      } else {
-        const seats = lpp.categoryWiseSeats?.[matrixCategory] ?? 0;
-        const { released, accepted, withdrawn, pending } = getOfferFigures(seats, cycleNumber);
-        return { seats, released, accepted, withdrawn, pending, apps: lppApps.filter((a) => a.category === matrixCategory).length };
-      }
+    const STAT_ROWS: { key: string; label: string; color?: string; bold?: boolean }[] = [
+      { key: 'seats',        label: 'Seats',        bold: true },
+      { key: 'released',     label: 'Released',     color: 'var(--color-text-muted)' },
+      { key: 'accepted',     label: 'Accepted',     color: '#276749', bold: true },
+      { key: 'withdrawn',    label: 'Withdrawn',    color: '#92400e', bold: true },
+      { key: 'pending',      label: 'Pending',      color: '#1d4ed8', bold: true },
+      { key: 'applications', label: 'Applications', bold: true },
+    ];
+
+    // Get all values for one (lpp, category)
+    function getCellData(lpp: LPP, cat: string) {
+      const seats = lpp.categoryWiseSeats?.[cat] ?? 0;
+      const { released, accepted, withdrawn, pending } = getOfferFigures(seats, cycleNumber);
+      const apps = allApplications.filter((a) => a.lppPreference === lpp.id && a.category === cat).length;
+      return { seats, released, accepted, withdrawn, pending, applications: apps };
     }
 
     return (
@@ -310,58 +379,82 @@ export default function CreateCyclePage() {
           {isFirstCycle ? ' Cycle 1 — no prior offers exist.' : ` Cycle ${cycleNumber} — offer figures from previous cycle.`}
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
-          <select
-            className="form-input"
-            style={{ width: 'auto', fontSize: '13px' }}
-            value={matrixCategory}
-            onChange={(e) => setMatrixCategory(e.target.value)}
-          >
-            <option value="All">All Categories</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left' }}>Program</th>
-                <th style={{ textAlign: 'center' }}>Seats</th>
-                <th style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>Released</th>
-                <th style={{ textAlign: 'center', color: '#276749' }}>Accepted</th>
-                <th style={{ textAlign: 'center', color: '#92400e' }}>Withdrawn</th>
-                <th style={{ textAlign: 'center', color: '#1d4ed8' }}>Pending</th>
-                <th style={{ textAlign: 'center' }}>Applications</th>
+                <th style={{ textAlign: 'left', minWidth: '130px' }}>Program</th>
+                <th style={{ textAlign: 'left', minWidth: '90px' }}></th>
+                {CATEGORIES.map((cat) => (
+                  <th key={cat} style={{ textAlign: 'center', minWidth: '70px' }}>{cat}</th>
+                ))}
+                <th style={{ textAlign: 'center', minWidth: '65px' }}>Total</th>
               </tr>
             </thead>
             <tbody>
-              {ptatLpps.map((lpp) => {
-                const { seats, released, accepted, withdrawn, pending, apps } = getRowData(lpp);
+              {ptatLpps.map((lpp, lppIdx) => {
+                const catData = CATEGORIES.map((cat) => getCellData(lpp, cat));
+                return STAT_ROWS.map((stat, statIdx) => {
+                  const isFirst = statIdx === 0;
+                  const isLast  = statIdx === STAT_ROWS.length - 1;
+                  const total   = catData.reduce((s, d) => s + (d[stat.key as keyof typeof d] as number), 0);
+                  return (
+                    <tr
+                      key={`${lpp.id}-${stat.key}`}
+                      style={{
+                        borderTop: isFirst && lppIdx > 0 ? '2px solid var(--color-border)' : undefined,
+                        background: isFirst ? 'var(--color-bg)' : undefined,
+                      }}
+                    >
+                      {/* Program name — only on first sub-row */}
+                      <td style={{ fontWeight: 700, color: 'var(--color-primary)', verticalAlign: 'middle' }}>
+                        {isFirst ? lpp.name : ''}
+                      </td>
+                      {/* Stat label */}
+                      <td style={{ color: stat.color ?? 'var(--color-text-muted)', fontSize: '12px', paddingLeft: isFirst ? undefined : '16px' }}>
+                        {stat.label}
+                      </td>
+                      {/* Per-category values */}
+                      {catData.map((d, ci) => (
+                        <td key={CATEGORIES[ci]} style={{ textAlign: 'center', color: stat.color, fontWeight: stat.bold ? 600 : 400 }}>
+                          {d[stat.key as keyof typeof d]}
+                        </td>
+                      ))}
+                      {/* Total */}
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: stat.color }}>{total}</td>
+                    </tr>
+                  );
+                });
+              })}
+
+              {/* Grand totals */}
+              {STAT_ROWS.map((stat, statIdx) => {
+                const isFirst = statIdx === 0;
+                const catTotals = CATEGORIES.map((cat) =>
+                  ptatLpps.reduce((s, lpp) => s + (getCellData(lpp, cat)[stat.key as keyof ReturnType<typeof getCellData>] as number), 0)
+                );
+                const grandTotal = catTotals.reduce((s, v) => s + v, 0);
                 return (
-                  <tr key={lpp.id}>
-                    <td style={{ fontWeight: 600 }}>{lpp.name}</td>
-                    <td style={{ textAlign: 'center' }}>{seats}</td>
-                    <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{released}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#276749' }}>{accepted}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#92400e' }}>{withdrawn}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 600, color: '#1d4ed8' }}>{pending}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{apps}</td>
+                  <tr
+                    key={`total-${stat.key}`}
+                    style={{
+                      borderTop: isFirst ? '2px solid var(--color-border)' : undefined,
+                      background: 'var(--color-primary-bg)',
+                    }}
+                  >
+                    <td style={{ fontWeight: 700 }}>{isFirst ? 'Total' : ''}</td>
+                    <td style={{ color: stat.color ?? 'var(--color-text-muted)', fontSize: '12px', paddingLeft: isFirst ? undefined : '16px' }}>{stat.label}</td>
+                    {catTotals.map((v, ci) => (
+                      <td key={CATEGORIES[ci]} style={{ textAlign: 'center', color: stat.color, fontWeight: stat.bold ? 600 : 400 }}>{v}</td>
+                    ))}
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: stat.color }}>{grandTotal}</td>
                   </tr>
                 );
               })}
-              {/* Totals row */}
-              <tr style={{ borderTop: '2px solid var(--color-border)', background: 'var(--color-primary-bg)' }}>
-                <td style={{ fontWeight: 700 }}>Total</td>
-                {['seats','released','accepted','withdrawn','pending','apps'].map((key) => {
-                  const total = ptatLpps.reduce((s, l) => s + getRowData(l)[key as keyof ReturnType<typeof getRowData>], 0);
-                  const color = key === 'accepted' ? '#276749' : key === 'withdrawn' ? '#92400e' : key === 'pending' ? '#1d4ed8' : undefined;
-                  return <td key={key} style={{ textAlign: 'center', fontWeight: 700, color }}>{total}</td>;
-                })}
-              </tr>
             </tbody>
           </table>
         </div>
+
         <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
           <span><span style={{ color: '#276749', fontWeight: 600 }}>Accepted</span> = offers accepted</span>
           <span><span style={{ color: '#92400e', fontWeight: 600 }}>Withdrawn</span> = offers withdrawn</span>
@@ -401,11 +494,12 @@ export default function CreateCyclePage() {
   }
 
   function renderStep4() {
+    const hasPrev = cycleNumber !== null && cycleNumber > 1;
     return (
       <div className="wizard-step">
         <h2 className="step-title">Evaluation Strategy</h2>
         <p className="step-subtitle">Choose how scores and rankings will be calculated.</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '28px' }}>
           {[
             { value: 'single',       title: 'Single Evaluation',       desc: 'One unified set of weights applied to all applicants across all programs.' },
             { value: 'program-wise', title: 'Program-wise Evaluation', desc: 'Each program gets its own score weights and separate rankings.' },
@@ -422,6 +516,40 @@ export default function CreateCyclePage() {
               </div>
             </label>
           ))}
+        </div>
+
+        <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>Score &amp; Rank Source</h3>
+        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '14px' }}>
+          Generate fresh scores or import from the previous approved cycle.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {[
+            { value: 'fresh',    title: 'Generate Fresh Scores & Rankings', desc: 'Compute new composite scores from current applicant data using configured weights and tiebreaker rules.' },
+            { value: 'previous', title: 'Use Previous Approved Rankings',   desc: 'Import the ranked list from the most recent approved cycle. Criteria and tiebreaker configuration will be skipped.' },
+          ].map(({ value, title, desc }) => {
+            const disabled = value === 'previous' && !hasPrev;
+            return (
+              <label key={value} className={`strategy-card${generationMode === value ? ' selected' : ''}`}
+                style={{ cursor: disabled ? 'not-allowed' : 'pointer', alignItems: 'flex-start', opacity: disabled ? 0.55 : 1 }}
+                onClick={() => !disabled && setGenerationMode(value as 'fresh' | 'previous')}>
+                <input type="radio" name="genMode" value={value} checked={generationMode === value}
+                  onChange={() => !disabled && setGenerationMode(value as 'fresh' | 'previous')}
+                  disabled={disabled}
+                  style={{ marginTop: '3px', marginRight: '12px' }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>
+                    {title}
+                    {disabled && (
+                      <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: 500, color: 'var(--color-text-muted)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1px 6px' }}>
+                        No previous cycle
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{desc}</div>
+                </div>
+              </label>
+            );
+          })}
         </div>
       </div>
     );
@@ -551,7 +679,9 @@ export default function CreateCyclePage() {
     return false;
   }
 
-  const stepLabels = ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Criteria & Tiebreakers'];
+  const stepLabels = generationMode === 'previous'
+    ? ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Approval']
+    : ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Approval'];
 
   return (
     <div className="page-container">
@@ -578,7 +708,7 @@ export default function CreateCyclePage() {
       </div>
 
       {/* Content */}
-      <div className="wizard-card">
+      <div className="wizard-card" style={step === 2 ? { maxWidth: '980px' } : undefined}>
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
@@ -594,7 +724,7 @@ export default function CreateCyclePage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px' }}>
           <button
             className="btn-secondary"
-            disabled={step === 1 && subStep5 === 'weights'}
+            disabled={step === 1 || submitting || generating}
             onClick={() => {
               if (step === 5 && subStep5 === 'tiebreakers') {
                 setSubStep5('weights');
@@ -610,13 +740,13 @@ export default function CreateCyclePage() {
             <button className="btn-primary" onClick={() => setSubStep5('tiebreakers')} disabled={!step5Valid()}>
               Next: Tiebreakers →
             </button>
-          ) : step < TOTAL_STEPS ? (
+          ) : step < totalSteps ? (
             <button className="btn-primary" onClick={() => setStep((s) => s + 1)} disabled={!stepValid()}>
               Next →
             </button>
           ) : (
-            <button className="btn-primary" onClick={handleSubmit} disabled={!stepValid() || submitting}>
-              {submitting ? 'Creating…' : 'Create Cycle'}
+            <button className="btn-primary" onClick={handleSubmit} disabled={!stepValid() || submitting || generating}>
+              {submitting ? 'Creating…' : generating ? 'Generating rankings…' : 'Create Cycle & Generate Rankings →'}
             </button>
           )}
         </div>
