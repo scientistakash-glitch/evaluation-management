@@ -35,10 +35,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
     }
 
-    if (!timeline.applicationPeriod?.start || !timeline.paymentPeriod?.end) {
-      return NextResponse.json({ error: 'All timeline dates are required' }, { status: 400 });
-    }
-
     const existing = await getAllCycles();
 
     // Auto-calculate cycle number for this PTAT + academicYear

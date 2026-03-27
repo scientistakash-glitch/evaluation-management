@@ -167,33 +167,77 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   // ── Load from sessionStorage ──────────────────────────────────────────────
 
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(`cycle-${cycleId}`);
-      if (!stored) {
-        setLoadError('Cycle data not found. Please go back and create the cycle again.');
-        setLoaded(true);
-        return;
-      }
-      const parsed = JSON.parse(stored);
-      setCycle(parsed.cycle);
-      setEvaluation(parsed.evaluation);
-      setPtat(parsed.ptat ?? null);
-      setLpps(parsed.lpps ?? []);
-      setFullLpps(parsed.lpps ?? []);
-      setGenerationMode(parsed.generationMode ?? 'fresh');
-      setApproved(parsed.evaluation?.status === 'Approved');
-      if (Array.isArray(parsed.rankRecords)) setRankRecords(parsed.rankRecords);
-    } catch {
-      setLoadError('Failed to load cycle data.');
-      setLoaded(true);
-      return;
-    }
+    async function load() {
+      // 1. Try sessionStorage first
+      let foundInSession = false;
+      try {
+        const stored = sessionStorage.getItem(`cycle-${cycleId}`);
+        if (stored) {
+          foundInSession = true;
+          const parsed = JSON.parse(stored);
+          setCycle(parsed.cycle);
+          setEvaluation(parsed.evaluation);
+          setPtat(parsed.ptat ?? null);
+          setLpps(parsed.lpps ?? []);
+          setFullLpps(parsed.lpps ?? []);
+          setGenerationMode(parsed.generationMode ?? 'fresh');
+          setApproved(parsed.evaluation?.status === 'Approved');
+          if (Array.isArray(parsed.rankRecords)) setRankRecords(parsed.rankRecords);
+        }
+      } catch { /* ignore */ }
 
-    fetch('/api/applications')
-      .then((r) => r.json())
-      .then((data) => setApplications(Array.isArray(data) ? data : []))
-      .catch(() => setApplications([]))
-      .finally(() => setLoaded(true));
+      // 2. If not in sessionStorage, fetch from API
+      if (!foundInSession) {
+        try {
+          const cycleRes = await fetch(`/api/cycles/${cycleId}`);
+          if (!cycleRes.ok) { setLoadError('Cycle not found.'); setLoaded(true); return; }
+          const cycleData = await cycleRes.json();
+          setCycle(cycleData);
+
+          const [ptatsRes, lppsRes, evalsRes] = await Promise.all([
+            fetch('/api/ptats'),
+            fetch(`/api/lpps?ptatId=${cycleData.ptatId}`),
+            fetch(`/api/evaluations?cycleId=${cycleId}`),
+          ]);
+          if (ptatsRes.ok) {
+            const ptats = await ptatsRes.json();
+            setPtat((ptats as { id: string; name: string }[]).find((p) => p.id === cycleData.ptatId) ?? null);
+          }
+          if (lppsRes.ok) {
+            const lppsData = await lppsRes.json();
+            setLpps(lppsData);
+            setFullLpps(lppsData);
+          }
+          if (evalsRes.ok) {
+            const evals = await evalsRes.json();
+            const ev = Array.isArray(evals) && evals.length > 0 ? evals[0] : null;
+            if (ev) {
+              setEvaluation(ev);
+              setApproved(ev.status === 'Approved');
+              const rankRes = await fetch(`/api/rank-records?evaluationId=${ev.id}`);
+              if (rankRes.ok) {
+                const records = await rankRes.json();
+                setRankRecords(Array.isArray(records) ? records : []);
+              }
+            }
+          }
+        } catch {
+          setLoadError('Failed to load cycle data.');
+          setLoaded(true);
+          return;
+        }
+      }
+
+      // Always fetch applications from API
+      try {
+        const appsRes = await fetch('/api/applications');
+        const appsData = appsRes.ok ? await appsRes.json() : [];
+        setApplications(Array.isArray(appsData) ? appsData : []);
+      } catch { /* ignore */ }
+
+      setLoaded(true);
+    }
+    load();
   }, [cycleId]);
 
   const appMap = new Map(applications.map((a) => [a.id, a]));
@@ -206,6 +250,17 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     try {
       setApproved(true);
       setEvaluation((prev) => prev ? { ...prev, status: 'Approved' } : prev);
+      if (cycle) {
+        sessionStorage.setItem(`cycle-${cycle.id}-status`, 'approval-pending');
+        try {
+          const raw = sessionStorage.getItem(`cycle-${cycle.id}`);
+          if (raw) {
+            const data = JSON.parse(raw);
+            data.cycle = { ...data.cycle, status: 'Active' };
+            sessionStorage.setItem(`cycle-${cycle.id}`, JSON.stringify(data));
+          }
+        } catch { /* ignore */ }
+      }
       showToast('Sent for approval successfully', 'success');
     } finally {
       setApproving(false);
@@ -356,9 +411,14 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
           <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px' }}>Send for Approval</div>
           {approved ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#276749', fontSize: '14px' }}>
-              <span style={{ fontSize: '18px' }}>✓</span>
-              <strong>Submitted for approval</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#276749', fontSize: '14px' }}>
+                <span style={{ fontSize: '18px' }}>✓</span>
+                <strong>Submitted for approval</strong>
+              </div>
+              <button className="btn-primary" style={{ width: 'fit-content' }} onClick={() => router.push('/')}>
+                Go to Homepage →
+              </button>
             </div>
           ) : (
             <>

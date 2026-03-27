@@ -3,14 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface CycleTimeline {
-  startDate: string;
-  offerReleaseDate: string;
-  acceptanceDeadline: string;
-  paymentDeadline: string;
-  closingDate: string;
-}
-
 interface Cycle {
   id: string;
   name: string;
@@ -18,38 +10,34 @@ interface Cycle {
   academicYear: string;
   ptatId: string;
   lppIds: string[];
-  timeline: CycleTimeline;
   status: 'Planned' | 'Active' | 'Closed' | 'Approved';
   evaluationStrategy: 'single' | 'program-wise' | null;
 }
 
 interface PTAT { id: string; name: string; }
-interface LPP  { id: string; ptatId: string; totalSeats: number; }
+interface LPP  { id: string; ptatId: string; name: string; totalSeats: number; }
 
-function statusBadge(status: string) {
-  const classes: Record<string, string> = {
-    Planned: 'badge badge-warning',
-    Active: 'badge badge-success',
-    Closed: 'badge badge-gray',
-    Approved: 'badge badge-maroon',
-  };
-  return <span className={classes[status] ?? 'badge badge-default'}>{status}</span>;
+type DisplayStatus = 'Draft' | 'Approval Pending' | 'Review Needed' | 'Approved' | 'Released';
+
+function getDisplayStatus(cycle: Cycle, hasOffers: boolean, statusOverride?: string): DisplayStatus {
+  if (hasOffers) return 'Released';
+  if (statusOverride === 'approval-pending') return 'Approval Pending';
+  switch (cycle.status) {
+    case 'Planned':  return 'Draft';
+    case 'Active':   return 'Approval Pending';
+    case 'Closed':   return 'Review Needed';
+    case 'Approved': return 'Approved';
+    default:         return 'Draft';
+  }
 }
 
-function formatDate(d: string) {
-  if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
-}
-
-function getOfferFigures(totalSeats: number, cycleNumber: number) {
-  if (cycleNumber <= 1) return { released: 0, accepted: 0, withdrawn: 0, pending: 0 };
-  const released  = Math.round(totalSeats * 0.85);
-  const accepted  = Math.round(released * 0.70);
-  const withdrawn = Math.round(released * 0.05);
-  const pending   = released - accepted - withdrawn;
-  return { released, accepted, withdrawn, pending };
-}
+const STATUS_BADGE: Record<DisplayStatus, string> = {
+  'Draft':            'badge-warning',
+  'Approval Pending': 'badge-default',
+  'Review Needed':    'badge-warning',
+  'Approved':         'badge-maroon',
+  'Released':         'badge-success',
+};
 
 export default function CyclesPage() {
   const router = useRouter();
@@ -58,11 +46,18 @@ export default function CyclesPage() {
   const [lpps, setLpps]       = useState<LPP[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [offerOverrides, setOfferOverrides] = useState<Record<string, { released: number; accepted: number; pending: number; withdrawn: number }>>({});
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const [hasDraft, setHasDraft] = useState(false);
 
   useEffect(() => {
     async function load() {
       setIsLoading(true);
       try {
+        // Reset server data once per browser session so each new tab starts fresh
+        if (!sessionStorage.getItem('app-session-initialized')) {
+          await fetch('/api/reset', { method: 'POST' });
+          sessionStorage.setItem('app-session-initialized', 'true');
+        }
         const [cyclesRes, ptatsRes, lppsRes] = await Promise.all([
           fetch('/api/cycles').then((r) => r.json()),
           fetch('/api/ptats').then((r) => r.json()),
@@ -76,22 +71,32 @@ export default function CyclesPage() {
       }
     }
     load();
+    setHasDraft(!!localStorage.getItem('create-cycle-draft'));
   }, []);
 
   useEffect(() => {
     if (cycles.length === 0) return;
     const overrides: Record<string, { released: number; accepted: number; pending: number; withdrawn: number }> = {};
+    const statuses: Record<string, string> = {};
     for (const cycle of cycles) {
       try {
         const stored = sessionStorage.getItem(`cycle-${cycle.id}-offers`);
         if (stored) overrides[cycle.id] = JSON.parse(stored);
+        const s = sessionStorage.getItem(`cycle-${cycle.id}-status`);
+        if (s) statuses[cycle.id] = s;
       } catch { /* ignore */ }
     }
     setOfferOverrides(overrides);
+    setStatusOverrides(statuses);
   }, [cycles]);
 
   const ptatMap = new Map(ptats.map((p) => [p.id, p]));
-  const lppTotalSeats = new Map(lpps.map((l) => [l.id, l.totalSeats]));
+  const lppMap  = new Map(lpps.map((l) => [l.id, l]));
+
+  function getLppNames(cycle: Cycle): string {
+    const names = (cycle.lppIds ?? []).map((id) => lppMap.get(id)?.name).filter(Boolean);
+    return names.length > 0 ? names.join(' · ') : '—';
+  }
 
   return (
     <div className="page-container">
@@ -101,6 +106,26 @@ export default function CyclesPage() {
           + Create New Cycle
         </button>
       </div>
+
+      {/* Draft in progress banner */}
+      {hasDraft && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '12px 18px', marginBottom: '16px',
+          background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px',
+          fontSize: '14px', color: '#92400e',
+        }}>
+          <span style={{ fontSize: '18px' }}>◐</span>
+          <span><strong>Draft cycle in progress</strong> — you have an unsaved cycle draft.</span>
+          <button
+            className="btn-primary"
+            style={{ marginLeft: 'auto', fontSize: '13px', padding: '6px 16px' }}
+            onClick={() => router.push('/create-cycle')}
+          >
+            Resume →
+          </button>
+        </div>
+      )}
 
       {isLoading ? (
         <div style={{ padding: '60px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -117,52 +142,41 @@ export default function CyclesPage() {
       ) : (
         <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ minWidth: '1000px' }}>
+            <table className="data-table" style={{ minWidth: '800px' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left' }}>Cycle</th>
-                  <th>Program Group</th>
-                  <th>Year</th>
-                  <th>#</th>
-                  <th>Strategy</th>
-                  <th>Status</th>
-                  <th>Start Date</th>
-                  <th>Offer Release</th>
-                  <th>Closing Date</th>
-                  <th style={{ color: 'var(--color-text-muted)' }}>Released</th>
-                  <th style={{ color: '#276749' }}>Accepted</th>
-                  <th style={{ color: '#1d4ed8' }}>Pending</th>
+                  <th style={{ textAlign: 'left' }}>Program Group</th>
+                  <th style={{ textAlign: 'left' }}>Program Plan</th>
+                  <th>Cycle Status</th>
+                  <th style={{ color: 'var(--color-text-muted)' }}>Offers Released</th>
+                  <th style={{ color: '#276749' }}>Committed</th>
                   <th style={{ color: '#92400e' }}>Withdrawn</th>
+                  <th style={{ color: '#1d4ed8' }}>Pending</th>
                 </tr>
               </thead>
               <tbody>
                 {cycles.map((cycle) => {
                   const ptat = ptatMap.get(cycle.ptatId);
-                  const totalSeats = (cycle.lppIds ?? []).reduce((s, id) => s + (lppTotalSeats.get(id) ?? 0), 0);
-                  const offers = offerOverrides[cycle.id] ?? getOfferFigures(totalSeats, cycle.number);
+                  const offers = offerOverrides[cycle.id];
+                  const displayStatus = getDisplayStatus(cycle, !!offers, statusOverrides[cycle.id]);
                   return (
                     <tr
                       key={cycle.id}
                       style={{ cursor: 'pointer' }}
-                      onClick={() => router.push(`/cycle/${cycle.id}/evaluation`)}
+                      onClick={() => router.push(`/cycle/${cycle.id}/view`)}
                     >
-                      <td style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{cycle.name}</td>
-                      <td style={{ fontSize: '13px' }}>{ptat?.name ?? cycle.ptatId}</td>
-                      <td style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>{cycle.academicYear}</td>
+                      <td>
+                        <div style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '14px' }}>{ptat?.name ?? cycle.ptatId}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>{cycle.academicYear} · #{cycle.number}</div>
+                      </td>
+                      <td style={{ fontSize: '13px', color: 'var(--color-text)' }}>{getLppNames(cycle)}</td>
                       <td style={{ textAlign: 'center' }}>
-                        <span className="badge badge-default" style={{ fontSize: '11px' }}>#{cycle.number}</span>
+                        <span className={`badge ${STATUS_BADGE[displayStatus]}`}>{displayStatus}</span>
                       </td>
-                      <td style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {cycle.evaluationStrategy === 'single' ? 'Single' : cycle.evaluationStrategy === 'program-wise' ? 'Program-wise' : '—'}
-                      </td>
-                      <td>{statusBadge(cycle.status)}</td>
-                      <td style={{ fontSize: '13px' }}>{formatDate(cycle.timeline?.startDate)}</td>
-                      <td style={{ fontSize: '13px' }}>{formatDate(cycle.timeline?.offerReleaseDate)}</td>
-                      <td style={{ fontSize: '13px' }}>{formatDate(cycle.timeline?.closingDate)}</td>
-                      <td style={{ textAlign: 'center', fontSize: '13px', color: 'var(--color-text-muted)' }}>{offers.released}</td>
-                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#276749' }}>{offers.accepted}</td>
-                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#1d4ed8' }}>{offers.pending}</td>
-                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#92400e' }}>{offers.withdrawn}</td>
+                      <td style={{ textAlign: 'center', fontSize: '13px', color: 'var(--color-text-muted)' }}>{offers?.released ?? 0}</td>
+                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#276749' }}>{offers?.accepted ?? 0}</td>
+                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#92400e' }}>{offers?.withdrawn ?? 0}</td>
+                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: 600, color: '#1d4ed8' }}>{offers?.pending ?? 0}</td>
                     </tr>
                   );
                 })}

@@ -13,15 +13,6 @@ interface LPP  {
   categoryWiseSeats: Record<string, number>;
 }
 
-interface CycleDateRange { start: string; end: string; }
-interface CycleTimeline {
-  applicationPeriod: CycleDateRange;
-  scoringPeriod: CycleDateRange;
-  offerReleasePeriod: CycleDateRange;
-  acceptancePeriod: CycleDateRange;
-  paymentPeriod: CycleDateRange;
-}
-
 interface TiebreakerRule {
   order: number;
   criterionId: 'entrance' | 'academic' | 'interview';
@@ -39,15 +30,13 @@ const CRITERION_OPTIONS: { id: 'entrance' | 'academic' | 'interview'; label: str
   { id: 'interview', label: 'Interview Score' },
 ];
 
-const TIMELINE_EVENTS: { key: keyof CycleTimeline; label: string }[] = [
-  { key: 'applicationPeriod',  label: 'Application Period' },
-  { key: 'scoringPeriod',      label: 'Score & Merit Period' },
-  { key: 'offerReleasePeriod', label: 'Offer Release Period' },
-  { key: 'acceptancePeriod',   label: 'Acceptance Period' },
-  { key: 'paymentPeriod',      label: 'Payment Period' },
+interface InstallmentRow { pct: number; amount: number; dueDate: string; }
+const FEE_AMOUNT = 731500;
+const INSTALLMENT_PLANS: { id: string; label: string; splits: number[] }[] = [
+  { id: 'INSTA_1', label: 'INSTA 1', splits: [100] },
+  { id: 'INSTA_2', label: 'INSTA 2', splits: [50, 50] },
+  { id: 'INSTA_3', label: 'INSTA 3', splits: [30, 30, 40] },
 ];
-
-const EMPTY_RANGE: CycleDateRange = { start: '', end: '' };
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -58,7 +47,7 @@ export default function CreateCyclePage() {
   const [step, setStep] = useState(1);
 
   // Cycle Definition sub-steps
-  const [cycleDefSubStep, setCycleDefSubStep] = useState<'group' | 'timeline'>('group');
+  const [cycleDefSubStep, setCycleDefSubStep] = useState<'group' | 'cycleDates' | 'feeDates'>('group');
 
   // Step 1a — Academic Year + Program Group
   const [academicYear, setAcademicYear] = useState(() => {
@@ -72,14 +61,25 @@ export default function CreateCyclePage() {
   const [loadingPtats, setLoadingPtats]       = useState(false);
   const [loadingCycleNum, setLoadingCycleNum] = useState(false);
 
-  // Step 1b — Timeline
-  const [timeline, setTimeline] = useState<CycleTimeline>({
-    applicationPeriod:  { ...EMPTY_RANGE },
-    scoringPeriod:      { ...EMPTY_RANGE },
-    offerReleasePeriod: { ...EMPTY_RANGE },
-    acceptancePeriod:   { ...EMPTY_RANGE },
-    paymentPeriod:      { ...EMPTY_RANGE },
-  });
+  // Step 1b — Cycle Date Definition
+  const [cycleCreatedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [withdrawalWithRefund,    setWithdrawalWithRefund]    = useState('');
+  const [withdrawalWithoutRefund, setWithdrawalWithoutRefund] = useState('');
+
+  // Step 1d — Fee Date Definition
+  const [installmentPlanId, setInstallmentPlanId] = useState('');
+  const [installmentRows,   setInstallmentRows]   = useState<InstallmentRow[]>([]);
+
+  function selectInstallmentPlan(planId: string) {
+    setInstallmentPlanId(planId);
+    const plan = INSTALLMENT_PLANS.find((p) => p.id === planId);
+    if (!plan) { setInstallmentRows([]); return; }
+    setInstallmentRows(plan.splits.map((pct) => ({
+      pct,
+      amount: Math.round((FEE_AMOUNT * pct) / 100),
+      dueDate: '',
+    })));
+  }
 
   // Step 2 — Strategy + Generation Mode
   const [strategy, setStrategy] = useState<'single' | 'program-wise' | null>(null);
@@ -120,6 +120,26 @@ export default function CreateCyclePage() {
     }).finally(() => setLoadingCycleNum(false));
   }, [selectedPtatId, academicYear]);
 
+  // Restore draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('create-cycle-draft');
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.step)                    setStep(d.step);
+      if (d.cycleDefSubStep)         setCycleDefSubStep(d.cycleDefSubStep);
+      if (d.academicYear)            setAcademicYear(d.academicYear);
+      if (d.selectedPtatId)          setSelectedPtatId(d.selectedPtatId);
+      if (d.withdrawalWithRefund)    setWithdrawalWithRefund(d.withdrawalWithRefund);
+      if (d.withdrawalWithoutRefund) setWithdrawalWithoutRefund(d.withdrawalWithoutRefund);
+      if (d.installmentPlanId)       setInstallmentPlanId(d.installmentPlanId);
+      if (d.installmentRows)         setInstallmentRows(d.installmentRows);
+      if (d.strategy)                setStrategy(d.strategy);
+      if (d.generationMode)          setGenerationMode(d.generationMode);
+      if (d.tiebreakerRules?.length) setTiebreakerRules(d.tiebreakerRules);
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Build programConfigs when strategy or LPPs change
   useEffect(() => {
     if (!strategy) return;
@@ -135,13 +155,14 @@ export default function CreateCyclePage() {
 
   function step1GroupValid() { return !!academicYear && !!selectedPtatId && cycleNumber !== null; }
 
-  function timelineValid() {
-    return (Object.keys(timeline) as (keyof CycleTimeline)[]).every(
-      (key) => timeline[key].start && timeline[key].end && timeline[key].start < timeline[key].end
-    );
+  function cycleDatesValid() {
+    return !!withdrawalWithRefund && !!withdrawalWithoutRefund
+      && withdrawalWithoutRefund >= withdrawalWithRefund;
   }
-
-  function step1Valid() { return step1GroupValid() && timelineValid(); }
+  function feeDatesValid() {
+    return !!installmentPlanId && installmentRows.every((r) => !!r.dueDate);
+  }
+  function step1Valid() { return step1GroupValid() && cycleDatesValid() && feeDatesValid(); }
   function step2Valid() { return strategy !== null; }
   function step3Valid() {
     if (subStep5 === 'weights') {
@@ -195,6 +216,20 @@ export default function CreateCyclePage() {
   }
   function weightsSum(w: ProgramWeights) { return w.entrance + w.academic + w.interview; }
 
+  // ── Draft ─────────────────────────────────────────────────────────────────────
+
+  function saveDraft() {
+    try {
+      localStorage.setItem('create-cycle-draft', JSON.stringify({
+        step, cycleDefSubStep, academicYear, selectedPtatId,
+        withdrawalWithRefund, withdrawalWithoutRefund,
+        installmentPlanId, installmentRows,
+        strategy, generationMode, tiebreakerRules,
+      }));
+      showToast('Draft saved', 'success');
+    } catch { /* ignore */ }
+  }
+
   // ── Submit ───────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
@@ -211,7 +246,8 @@ export default function CreateCyclePage() {
         body: JSON.stringify({
           academicYear, ptatId: selectedPtatId,
           ptatName: selectedPtatObj?.name ?? selectedPtatId,
-          lppIds, timeline,
+          lppIds,
+          timeline: { applicationPeriod: { start: '', end: '' }, scoringPeriod: { start: '', end: '' }, offerReleasePeriod: { start: '', end: '' }, acceptancePeriod: { start: '', end: '' }, paymentPeriod: { start: '', end: '' } },
           evaluationStrategy: strategy,
           programConfigs: generationMode === 'previous'
             ? (strategy === 'single'
@@ -292,6 +328,7 @@ export default function CreateCyclePage() {
         cycle, evaluation: updatedEval, ptat: selectedPtatObj, lpps: ptatLpps, generationMode, rankRecords: allRankRecords,
       }));
       showToast(generationMode === 'previous' ? 'Rankings imported successfully' : 'Rankings generated successfully', 'success');
+      localStorage.removeItem('create-cycle-draft');
       router.push(`/cycle/${cycle.id}/evaluation`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed';
@@ -365,58 +402,164 @@ export default function CreateCyclePage() {
     );
   }
 
-  function renderTimelineSubStep() {
-    const hasErrors = (Object.keys(timeline) as (keyof CycleTimeline)[]).some(
-      (key) => timeline[key].start && timeline[key].end && timeline[key].start >= timeline[key].end
-    );
+  function renderCycleDatesSubStep() {
+    const refundErr = withdrawalWithRefund && withdrawalWithoutRefund && withdrawalWithoutRefund < withdrawalWithRefund;
     return (
       <>
-        <h2 className="step-title">Cycle Timeline</h2>
-        <p className="step-subtitle">Set the start and end date &amp; time for each phase of this admissions cycle.</p>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table" style={{ fontSize: '13px', width: '100%', minWidth: '600px' }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: 'left', minWidth: '180px' }}>Phase</th>
-                <th style={{ textAlign: 'left', minWidth: '220px' }}>Start</th>
-                <th style={{ width: '24px' }}></th>
-                <th style={{ textAlign: 'left', minWidth: '220px' }}>End</th>
-              </tr>
-            </thead>
-            <tbody>
-              {TIMELINE_EVENTS.map(({ key, label }) => {
-                const range = timeline[key];
-                const invalid = range.start && range.end && range.start >= range.end;
-                return (
-                  <tr key={key}>
-                    <td style={{ fontWeight: 500 }}>{label}</td>
-                    <td>
-                      <input
-                        type="datetime-local"
-                        className="form-input"
-                        style={{ fontSize: '13px', borderColor: invalid ? '#e53e3e' : undefined }}
-                        value={range.start}
-                        onChange={(e) => setTimeline((t) => ({ ...t, [key]: { ...t[key], start: e.target.value } }))}
-                      />
-                    </td>
-                    <td style={{ textAlign: 'center', color: '#9ca3af', fontWeight: 600 }}>→</td>
-                    <td>
-                      <input
-                        type="datetime-local"
-                        className="form-input"
-                        style={{ fontSize: '13px', borderColor: invalid ? '#e53e3e' : undefined }}
-                        value={range.end}
-                        onChange={(e) => setTimeline((t) => ({ ...t, [key]: { ...t[key], end: e.target.value } }))}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <h2 className="step-title">Cycle Date Definition</h2>
+        <p className="step-subtitle">Set key administrative dates for this admissions cycle.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ maxWidth: '480px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '6px' }}>
+              Cycle Created Date
+            </label>
+            <input
+              type="date"
+              className="form-input"
+              value={cycleCreatedDate}
+              readOnly
+              style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', cursor: 'default' }}
+            />
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Auto-generated</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '6px' }}>
+                Withdrawal Due Date <span style={{ fontWeight: 400 }}>(with Refund)</span>
+              </label>
+              <input
+                type="datetime-local"
+                className="form-input"
+                value={withdrawalWithRefund}
+                onChange={(e) => setWithdrawalWithRefund(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '6px' }}>
+                Withdrawal Due Date <span style={{ fontWeight: 400 }}>(without Refund)</span>
+              </label>
+              <input
+                type="datetime-local"
+                className="form-input"
+                value={withdrawalWithoutRefund}
+                style={{ borderColor: refundErr ? '#e53e3e' : undefined }}
+                onChange={(e) => setWithdrawalWithoutRefund(e.target.value)}
+              />
+              {refundErr && (
+                <div style={{ fontSize: '12px', color: '#e53e3e', marginTop: '4px' }}>
+                  Must be on or after the &quot;with Refund&quot; date.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        {hasErrors && (
-          <div style={{ marginTop: '10px', color: '#e53e3e', fontSize: '13px' }}>End date must be after start date for each phase.</div>
+      </>
+    );
+  }
+
+  function renderFeeDatesSubStep() {
+    const selectedPlan = INSTALLMENT_PLANS.find((p) => p.id === installmentPlanId);
+    return (
+      <>
+        <h2 className="step-title">Fee Date Definition</h2>
+        <p className="step-subtitle">Select an installment plan and configure payment due dates.</p>
+
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '6px' }}>
+            * Installment Plan
+          </label>
+          <select
+            className="form-input"
+            value={installmentPlanId}
+            onChange={(e) => selectInstallmentPlan(e.target.value)}
+          >
+            <option value="">— Select installment plan —</option>
+            {INSTALLMENT_PLANS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {selectedPlan && (
+          <>
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '10px' }}>Fee Information</div>
+              <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>CATEGORY</th>
+                    <th>QUOTA</th>
+                    <th>CURRENCY TYPE</th>
+                    <th>FEE AMOUNT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Domestic</td>
+                    <td>General</td>
+                    <td>INR</td>
+                    <td>{FEE_AMOUNT.toLocaleString('en-IN')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '10px' }}>Installments</div>
+              <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px' }}>#</th>
+                    <th>PERCENTAGE</th>
+                    <th>AMOUNT</th>
+                    <th>DUE DATE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {installmentRows.map((row, idx) => (
+                    <tr key={idx}>
+                      <td>{idx + 1}</td>
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={row.pct.toFixed(2)}
+                          readOnly
+                          style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', cursor: 'default', width: '100px' }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          className="form-input"
+                          value={row.amount}
+                          style={{ width: '140px' }}
+                          onChange={(e) => setInstallmentRows((prev) =>
+                            prev.map((r, i) => i === idx ? {
+                              ...r,
+                              amount: Number(e.target.value),
+                              pct: parseFloat(((Number(e.target.value) / FEE_AMOUNT) * 100).toFixed(2)),
+                            } : r)
+                          )}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="datetime-local"
+                          className="form-input"
+                          value={row.dueDate}
+                          style={{ width: '200px' }}
+                          onChange={(e) => setInstallmentRows((prev) =>
+                            prev.map((r, i) => i === idx ? { ...r, dueDate: e.target.value } : r)
+                          )}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </>
     );
@@ -427,10 +570,11 @@ export default function CreateCyclePage() {
       <div className="wizard-step">
         {/* Mini sub-stepper */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0', marginBottom: '24px', padding: '12px 16px', background: 'var(--color-bg)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
-          {(['group', 'timeline'] as const).map((sub, i) => {
-            const isDone   = sub === 'group' && cycleDefSubStep === 'timeline';
+          {(['group', 'cycleDates', 'feeDates'] as const).map((sub, i) => {
+            const subOrder = ['group', 'cycleDates', 'feeDates'];
+            const isDone   = subOrder.indexOf(sub) < subOrder.indexOf(cycleDefSubStep);
             const isActive = sub === cycleDefSubStep;
-            const label    = sub === 'group' ? 'A — Year & Group' : 'B — Timeline';
+            const label    = sub === 'group' ? 'A — Year & Group' : sub === 'cycleDates' ? 'B — Cycle Dates' : 'C — Fee Dates';
             return (
               <React.Fragment key={sub}>
                 {i > 0 && (
@@ -454,8 +598,9 @@ export default function CreateCyclePage() {
           })}
         </div>
 
-        {cycleDefSubStep === 'group'    && renderGroupSubStep()}
-        {cycleDefSubStep === 'timeline' && renderTimelineSubStep()}
+        {cycleDefSubStep === 'group'      && renderGroupSubStep()}
+        {cycleDefSubStep === 'cycleDates' && renderCycleDatesSubStep()}
+        {cycleDefSubStep === 'feeDates'   && renderFeeDatesSubStep()}
       </div>
     );
   }
@@ -680,29 +825,43 @@ export default function CreateCyclePage() {
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px' }}>
-          {/* Back button */}
+          {/* Left: Back + Save as Draft */}
+          <div style={{ display: 'flex', gap: '10px' }}>
           <button
             className="btn-secondary"
             disabled={(step === 1 && cycleDefSubStep === 'group') || submitting || generating}
             onClick={() => {
-              if (step === 1 && cycleDefSubStep === 'timeline') {
-                setCycleDefSubStep('group');
-              } else if (step === 3 && subStep5 === 'tiebreakers') {
-                setSubStep5('weights');
-              } else {
-                if (step === 3) setSubStep5('weights');
-                if (step === 2) setCycleDefSubStep('timeline');
-                setStep((s) => s - 1);
-              }
+              if (step === 1 && cycleDefSubStep === 'cycleDates') { setCycleDefSubStep('group');      return; }
+              if (step === 1 && cycleDefSubStep === 'feeDates')   { setCycleDefSubStep('cycleDates'); return; }
+              if (step === 3 && subStep5 === 'tiebreakers')       { setSubStep5('weights');           return; }
+              if (step === 2) { setCycleDefSubStep('feeDates'); setStep((s) => s - 1); return; }
+              if (step === 3) { setSubStep5('weights'); setStep((s) => s - 1); }
             }}
           >
             ← Back
           </button>
+          <button
+            className="btn-secondary"
+            disabled={submitting || generating}
+            onClick={saveDraft}
+            style={{ fontSize: '13px' }}
+          >
+            Save as Draft
+          </button>
+          </div>
 
           {/* Next / Submit */}
           {step === 1 && cycleDefSubStep === 'group' ? (
-            <button className="btn-primary" onClick={() => setCycleDefSubStep('timeline')} disabled={!step1GroupValid()}>
-              Next: Timeline →
+            <button className="btn-primary" onClick={() => setCycleDefSubStep('cycleDates')} disabled={!step1GroupValid()}>
+              Next: Cycle Dates →
+            </button>
+          ) : step === 1 && cycleDefSubStep === 'cycleDates' ? (
+            <button className="btn-primary" onClick={() => setCycleDefSubStep('feeDates')} disabled={!cycleDatesValid()}>
+              Next: Fee Dates →
+            </button>
+          ) : step === 1 && cycleDefSubStep === 'feeDates' ? (
+            <button className="btn-primary" onClick={() => setStep((s) => s + 1)} disabled={!feeDatesValid()}>
+              Next →
             </button>
           ) : step === 3 && subStep5 === 'weights' ? (
             <button className="btn-primary" onClick={() => setSubStep5('tiebreakers')} disabled={!programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5)}>

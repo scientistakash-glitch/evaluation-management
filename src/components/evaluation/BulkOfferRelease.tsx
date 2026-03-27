@@ -281,6 +281,7 @@ export default function BulkOfferRelease({
       sessionStorage.setItem(`cycle-${cycleId}-offers`, JSON.stringify({
         released: totalOffered, pending: totalWaitlisted, accepted: 0, withdrawn: 0,
       }));
+      sessionStorage.setItem(`cycle-${cycleId}-configRows`, JSON.stringify(configRows));
     } catch { /* ignore */ }
   }
 
@@ -326,14 +327,14 @@ export default function BulkOfferRelease({
           {/* Definitions block — above table */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#374151' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px' }}>
-              <b>Approved Intake</b>        <span>Total sanctioned seats for this subcategory</span>
-              <b>Committed</b>              <span>Indicative — students who have paid the program fee (approx. 8%)</span>
-              <b>Available Seats</b>        <span>Approved Intake minus Committed seats</span>
-              <b>Applicants</b>             <span>Total ranked applicants for this program</span>
-              <b>Eligible Pool</b>          <span>Indicative — applicants meeting minimum eligibility criteria (approx. 75%)</span>
-              <b>Pending Acceptance</b>     <span>Indicative — offers awaiting confirmation (approx. 30% of Offers to Release)</span>
-              <b>Withdrawn</b>              <span>Indicative — applicants who have exited the process (approx. 5% of Offers to Release)</span>
-              <b>Waitlisted for Next Cycle</b><span>Eligible Pool minus Offers to Release — auto-calculated</span>
+              <b>Approved Intake</b>          <span>Total sanctioned seats for this subcategory</span>
+              <b>Committed</b>                <span>Students who have paid the commitment fee</span>
+              <b>Available Seats</b>          <span>Approved Intake minus Committed seats</span>
+              <b>Applicants</b>               <span>Total applications for this program</span>
+              <b>Eligible Pool</b>            <span>Applicants meeting minimum eligibility criteria and previous cycle waitlisted</span>
+              <b>Pending Acceptance</b>       <span>Offers awaiting confirmation</span>
+              <b>Withdrawn</b>                <span>Applicants who have exited the process</span>
+              <b>Waitlisted for Next Cycle</b> <span>Eligible Pool minus Offers to Release</span>
             </div>
           </div>
 

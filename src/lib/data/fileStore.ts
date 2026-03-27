@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import path from 'path';
+import fs from 'fs';
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
@@ -267,6 +269,8 @@ const WRITABLE_KEYS = [
   'rank-records.json',
 ];
 
+const DATA_DIR = path.join(process.cwd(), 'data');
+
 // ── In-memory store ────────────────────────────────────────────────────────────
 
 const store: Record<string, any[]> = {
@@ -281,15 +285,34 @@ const store: Record<string, any[]> = {
 export function resetStore(): void {
   for (const key of WRITABLE_KEYS) {
     store[key] = [];
+    try {
+      fs.writeFileSync(path.join(DATA_DIR, key), '[]', 'utf-8');
+    } catch { /* ignore */ }
   }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function readJson<T>(filename: string): Promise<T[]> {
+  if (WRITABLE_KEYS.includes(filename)) {
+    const filePath = path.join(DATA_DIR, filename);
+    if (fs.existsSync(filePath)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        store[filename] = parsed;
+        return parsed as T[];
+      } catch { /* fall through to in-memory */ }
+    }
+  }
   return (store[filename] ?? []) as T[];
 }
 
 export async function writeJson<T>(filename: string, data: T[]): Promise<void> {
   store[filename] = data;
+  if (WRITABLE_KEYS.includes(filename)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(path.join(DATA_DIR, filename), JSON.stringify(data, null, 2), 'utf-8');
+    } catch { /* ignore write errors */ }
+  }
 }
