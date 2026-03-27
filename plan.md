@@ -419,11 +419,12 @@ The wizard has `totalSteps = 5` (fresh) or `4` (previous import mode). Each step
 #### Step 2 — Seat Matrix (read-only)
 
 - Displays seat allocation for all LPPs in selected PTAT
+- **Definitions legend card** (above table): explains all 6 stat rows with colored labels
 - **Table layout:** rows = program × stat-type; columns = categories (General, OBC, SC, ST, EWS) + Total
-- **Stats per cell:** Seats, Released, Accepted, Withdrawn, Pending, Applications
+- **Stat row order:** Seats → Applicants → Released → Accepted → Withdrawn → Pending
   - `seats` = `lpp.categoryWiseSeats[category]`
-  - `released/accepted/withdrawn/pending` = `getOfferFigures(seats, cycleNumber)` — returns 0 for cycle 1, mock figures for later cycles
-  - `applications` = count of `allApplications` where `lppPreference === lpp.id && category === cat`
+  - `applications` (labeled "Applicants") = count of `allApplications` where `lppPreference === lpp.id && category === cat`
+  - `released/accepted/withdrawn/pending` = `getOfferFigures(seats, cycleNumber)` — 0 for cycle 1, mock % for later cycles
 - Grand totals row at bottom sums per category
 
 #### Step 3 — Timelines
@@ -509,28 +510,16 @@ Three sub-steps controlled by `evalStep` state: `'scores' | 'offers' | 'approval
 
 #### Sub-step: Scores & Merit List
 
-KPI summary cards:
+KPI summary cards (4 cards, always visible):
 - Total Students (unique applicationIds in rankRecords)
-- Programs Ranked (`uniqueProgramIds.length` — programs extracted from rankRecords)
+- Programs Ranked (`uniqueProgramIds.length`)
 - Strategy (Single / Program-wise)
 - Tiebreakers Applied (count of students with `tieBreakerApplied = true`)
 
-**Merit List Summary Table** (`buildSummary()`):
-- Groups rankRecords by `(programId, category)`
-- Columns: Program, Category, Students Ranked, Highest Score, Lowest Score, Avg Score
-- Rows sorted by program order then by category (General, OBC, SC, ST, EWS)
-- Program name shown only on first row per program group
-
-**Ranking Table:**
-- `isStudentCentric = uniqueProgramIds.length > 0` (always true after current fix)
-- Student-centric view: one row per student
-  - Fixed columns: Global Rank, App ID, Student Name, Category, Cat. Rank, Score
-  - Dynamic columns per program: `{ShortName} Rank` + `{ShortName} TB` (tiebreaker info)
-  - "—" if student didn't apply to that program
-  - TB column shows criterion + value if tiebreaker was applied for that program
-- Shows top 10 rows; "Download CSV" for full data
-
-CSV download via `downloadCSV()` helper — includes all students, all program rank columns.
+**No data tables shown.** After cards, a centered block shows:
+- "Rankings Generated" heading + student/program count subtext
+- "↓ Download Merit List CSV" button — calls `downloadCSV()` with all students sorted by score
+- "Next: Bulk Offer Release →" navigation button
 
 ---
 
@@ -539,31 +528,28 @@ CSV download via `downloadCSV()` helper — includes all students, all program r
 **File:** `src/components/evaluation/BulkOfferRelease.tsx`
 
 **Phase 1 — Configure:**
-- Table: Program | Category | Available Seats | Offers to Release (editable input)
-- Rows: one per (program × category) combination
-- Available seats = `lpp.categoryWiseSeats[category]`
-- Offers to Release defaults to available seats; user can reduce
-- "Reset to Defaults" restores all inputs
 
-**Phase 2 — Release:** runs `releaseOffers()` algorithm (see §8.3), shows results
+Definitions legend card (above table, 2-col grid): explains Previous Cycle Last Rank, Current Cycle Last Rank, Waitlisted, Pending Acceptance, Withdrawn.
 
-**Results table (preference-centric view):**
-- One row per student (top 10 shown; CSV for full)
-- Fixed columns: #, App ID, Student Name, Category, Score
-- Dynamic columns: for each preference slot (Pref 1 … Pref N): Program Name + Status
+Config table columns: Program | Category | Applicants | Previous Cycle Last Rank | Current Cycle Last Rank | Avail. Seats | Offers to Release | Waitlisted | Pending Acceptance | Withdrawn
 
-Status per preference cell:
-| Condition | Display |
-|-----------|---------|
-| `pref.lppId === awardedProgramId` | Green **Offered** badge |
-| `pref.preferenceOrder > awardedPrefOrder` (lower priority than offer) | Gray italic *Not Considered* |
-| `pref.preferenceOrder < awardedPrefOrder` (higher priority, didn't get) | Amber **WL #N** badge |
-| Not offered anywhere | Amber **WL #N** for all prefs |
-| Student didn't apply to this pref | `—` |
+- **Applicants**: count of rankRecords for that (programId, category)
+- **Previous Cycle Last Rank**: mock = `ceil(availableSeats × 0.9)`; shows "–" if `hasPreviousCycle === false`
+- **Current Cycle Last Rank**: `rankRecords[offersToRelease - 1].categoryRank` sorted by categoryRank ASC; updates live as input changes; "–" if offersToRelease = 0
+- **Offers to Release**: editable number input (0–availableSeats)
+- **Waitlisted**: `max(0, applicants − offersToRelease)` — live
+- **Pending Acceptance**: mock = `round(offersToRelease × 0.3)` — indicative
+- **Withdrawn**: mock = `round(offersToRelease × 0.05)` — indicative
 
-Category filter + "Reconfigure" button (goes back to config phase) + CSV download.
+**Phase 2 — Release:** runs `releaseOffers()` algorithm (see §8.3)
 
-Summary cards: Offers Released, Waitlisted, Total Students, Programs.
+**Results — no table.** Summary cards only:
+- **Prev. Cycle Offers**: `prevCycleOfferCount` (computed at release time = sum of `ceil(seats × 0.9)` per row; "–" if Cycle 1)
+- **Curr. Cycle Offers**: `results.filter(r => r.awardedProgramId !== null).length`
+- **Waitlisted**: `results.filter(r => r.awardedProgramId === null).length`
+- **Programs**: `programIds.length`
+
+Action row: Reconfigure | ↓ Download CSV | Proceed to Approval →
 
 ---
 
@@ -691,7 +677,7 @@ const store: Record<string, unknown[]> = {
   // Read-only (seeded, never cleared)
   'ptats.json':        [...],   // 4 PTATs
   'lpps.json':         [...],   // 14 LPPs
-  'applications.json': [...],   // 80 Applications
+  'applications.json': [...],   // 580 Applications (80 original + 500 generated B.Tech)
   'criteria-sets.json':[...],   // 1 CriteriaSet
 
   // Writable (cleared by /api/reset)
@@ -742,19 +728,24 @@ resetStore(): void                             // clears all writable keys to []
 **Category-wise seat distribution (all LPPs):**
 - General: ~50%, OBC: ~27%, SC: ~15%, ST: ~5%, EWS: ~3%
 
-**Applications:**
+**Applications (580 total):**
 | Range | PTAT | Preferences |
 |-------|------|-------------|
 | app_001–app_030 | B.Tech (ptat_001) | Full 4-program ranked preferences (BTECH_PREFS) |
-| app_031–app_050 | M.Tech (ptat_002) | Single preference |
-| app_051–app_070 | MBA (ptat_003) | Single preference |
-| app_071–app_080 | M.Sc (ptat_004) | Single preference |
+| app_077–app_080 | B.Tech extras | Full 4-program ranked preferences (BTECH_PREFS) |
+| app_101–app_600 | B.Tech generated (500) | 2, 3, or 4 preferences (index % 3 determines count) |
+| app_031–app_076 | M.Tech / MBA / M.Sc | Single preference |
 
-**B.Tech students (app_001–app_030)** all have `lppPreferences` with all 4 B.Tech LPPs ranked. Example:
-```
-app_001: [lpp_001(1), lpp_003(2), lpp_002(3), lpp_004(4)]  → CSE > ECE > Mech > Civil
-app_079: [lpp_002(1), lpp_001(2), lpp_003(3), lpp_004(4)]  → Mech > CSE > ECE > Civil
-```
+**B.Tech preference logic (all B.Tech students):**
+Preferences stored in `BTECH_PREFS` record (static for app_001–app_080; computed for app_101–app_600 via loop).
+Attached to applications at module init: `app.lppPreferences = BTECH_PREFS[app.id] ?? [single]`
+
+**Generated B.Tech students (app_101–app_600):**
+- Category distribution: General 250 | OBC 135 | SC 75 | ST 25 | EWS 15
+- Preference count: `n % 3 === 0` → 2 prefs, `n % 3 === 1` → 3 prefs, `n % 3 === 2` → all 4
+- Preference order: LPP array rotated by `n % 4` (deterministic, no Math.random)
+- Scores: entranceScore 150–300, academicScore 55–99, interviewScore 50–100 (all deterministic)
+- Names: `FIRST[n % 10] + LAST[floor(n/10) % 10]` from 10-name arrays
 
 **Criteria Set (seeded):**
 - ID: `cs_001`, Name: "Standard Engineering Criteria"

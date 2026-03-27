@@ -549,6 +549,19 @@ body { background: var(--color-bg); font-family: -apple-system, BlinkMacSystemFo
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: #FDFAFA; }
 
+/* Definitions footer */
+.definitions-footer {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  color: #6b7280;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+}
+.definitions-footer b { color: #374151; }
+
 /* Category badges */
 .cat-general { background: #DBEAFE; color: #1E40AF; }
 .cat-obc { background: #D1FAE5; color: #065F46; }

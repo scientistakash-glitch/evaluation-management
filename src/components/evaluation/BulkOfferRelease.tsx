@@ -53,7 +53,6 @@ interface StudentOfferResult {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const CATEGORIES = ['General', 'OBC', 'SC', 'ST', 'EWS'];
-const PAGE_SIZE = 15;
 
 const CATEGORY_COLORS: Record<string, string> = {
   General: 'badge-default', OBC: 'badge-warning', SC: 'badge-success', ST: 'badge-gray', EWS: 'badge-maroon',
@@ -71,6 +70,8 @@ interface Props {
   uniqueProgramIds: string[];
   lppMap: Map<string, string>;
   appMap: Map<string, Application>;
+  hasPreviousCycle?: boolean;
+  onProceed?: () => void;
 }
 
 // ── Offer Release Algorithm ────────────────────────────────────────────────────
@@ -184,20 +185,10 @@ function releaseOffers(
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankRecords, applications, studentRankMap, uniqueProgramIds, lppMap, appMap }: Props) {
+export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankRecords, applications, studentRankMap, uniqueProgramIds, lppMap, appMap, hasPreviousCycle, onProceed }: Props) {
   const isSingle = strategy === 'single';
   // After per-program generation, uniqueProgramIds always has actual program IDs
   const programIds = uniqueProgramIds.length > 0 ? uniqueProgramIds : (isSingle ? ['all'] : []);
-
-  // Max preferences across all students (for result table columns)
-  const maxPrefs = useMemo(() => {
-    let max = 1;
-    for (const app of applications) {
-      const n = app.lppPreferences?.length ?? 1;
-      if (n > max) max = n;
-    }
-    return max;
-  }, [applications]);
 
   // Build initial config rows
   const defaultConfig = useMemo(() => {
@@ -222,8 +213,7 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
 
   const [configRows, setConfigRows] = useState<OfferConfigRow[]>(defaultConfig);
   const [results, setResults] = useState<StudentOfferResult[] | null>(null);
-  const [resultPage, setResultPage] = useState(1);
-  const [resultCategoryFilter, setResultCategoryFilter] = useState('All');
+  const [prevCycleOfferCount, setPrevCycleOfferCount] = useState<number | null>(null);
 
   function updateOffers(programId: string, category: string, value: number) {
     setConfigRows((prev) =>
@@ -240,9 +230,12 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
   }
 
   function handleRelease() {
+    const prevCount = hasPreviousCycle
+      ? configRows.reduce((sum, r) => sum + Math.ceil(r.availableSeats * 0.9), 0)
+      : null;
+    setPrevCycleOfferCount(prevCount);
     const offerResults = releaseOffers(configRows, rankRecords, applications, appMap);
     setResults(offerResults);
-    setResultPage(1);
 
     // Persist to sessionStorage for home page
     const totalOffered = offerResults.filter((r) => r.awardedProgramId !== null).length;
@@ -292,14 +285,6 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
     URL.revokeObjectURL(url);
   }
 
-  // ── Filtered & paginated results ─────────────────────────────────────────────
-
-  const filteredResults = results
-    ? results.filter((r) => resultCategoryFilter === 'All' || r.category === resultCategoryFilter)
-    : [];
-  const totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
-  const pageResults = filteredResults.slice((resultPage - 1) * PAGE_SIZE, resultPage * PAGE_SIZE);
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (fullLpps.length === 0 && !isSingle) {
@@ -316,16 +301,19 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
       {/* Config Table */}
       {!results && (
         <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Configure Offers per Program &amp; Category
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>
+            Configure Offers per Program &amp; Category
+          </div>
+
+          {/* Definitions block — above table */}
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#374151' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px' }}>
+              <b>Previous Cycle Last Rank</b><span>Category rank of the last student offered a seat in this program &amp; category in the previous cycle</span>
+              <b>Current Cycle Last Rank</b><span>Updates live — rank of the last student to receive an offer at the current Offers to Release number</span>
+              <b>Waitlisted</b><span>Applicants ranked beyond the current offer cutoff</span>
+              <b>Pending Acceptance</b><span>Indicative — offers awaiting confirmation (approx. 30%)</span>
+              <b>Withdrawn</b><span>Indicative — students who have exited the process (approx. 5%)</span>
             </div>
-            <button
-              onClick={resetDefaults}
-              style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              Reset to Defaults
-            </button>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -334,20 +322,38 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
                 <tr>
                   <th style={{ textAlign: 'left' }}>Program</th>
                   <th>Category</th>
-                  <th>Available Seats</th>
+                  <th>Applicants</th>
+                  <th>Previous Cycle Last Rank</th>
+                  <th>Current Cycle Last Rank</th>
+                  <th>Avail. Seats</th>
                   <th>Offers to Release</th>
+                  <th>Waitlisted</th>
+                  <th>Pending Acceptance</th>
+                  <th>Withdrawn</th>
                 </tr>
               </thead>
               <tbody>
                 {configRows.map((row, i) => {
                   const prevRow = configRows[i - 1];
                   const isNewProgram = !prevRow || prevRow.programId !== row.programId;
+                  const applicants = rankRecords.filter((r) => r.programId === row.programId && r.category === row.category).length;
+                  const prevLastRank = hasPreviousCycle ? Math.ceil(row.availableSeats * 0.9) : null;
+                  const currList = rankRecords
+                    .filter((r) => r.programId === row.programId && r.category === row.category)
+                    .sort((a, b) => a.categoryRank - b.categoryRank);
+                  const currLastRank = row.offersToRelease > 0 ? (currList[row.offersToRelease - 1]?.categoryRank ?? null) : null;
+                  const waitlisted = Math.max(0, applicants - row.offersToRelease);
+                  const pending = Math.round(row.offersToRelease * 0.3);
+                  const withdrawn = Math.round(row.offersToRelease * 0.05);
                   return (
                     <tr key={`${row.programId}-${row.category}`} style={{ background: isNewProgram && i > 0 ? 'var(--color-bg)' : undefined }}>
                       <td style={{ fontWeight: isNewProgram ? 700 : 400, color: isNewProgram ? 'var(--color-primary)' : 'var(--color-text-muted)', fontSize: isNewProgram ? '13px' : '12px' }}>
                         {isNewProgram ? row.programName : ''}
                       </td>
                       <td><span className={`badge ${CATEGORY_COLORS[row.category] ?? 'badge-default'}`} style={{ fontSize: '11px' }}>{row.category}</span></td>
+                      <td style={{ textAlign: 'center' }}>{applicants}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{prevLastRank ?? '–'}</td>
+                      <td style={{ textAlign: 'center', fontWeight: currLastRank !== null ? 600 : 400, color: currLastRank !== null ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>{currLastRank ?? '–'}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.availableSeats}</td>
                       <td style={{ textAlign: 'center' }}>
                         <input
@@ -360,6 +366,9 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
                           onChange={(e) => updateOffers(row.programId, row.category, parseInt(e.target.value) || 0)}
                         />
                       </td>
+                      <td style={{ textAlign: 'center', color: waitlisted > 0 ? '#b45309' : 'var(--color-text-muted)' }}>{waitlisted}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{pending}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{withdrawn}</td>
                     </tr>
                   );
                 })}
@@ -381,110 +390,21 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
       {/* Results */}
       {results && (
         <>
-          {/* Summary cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-            <SummaryCard label="Offers Released" value={String(results.filter((r) => r.awardedProgramId !== null).length)} color="#276749" />
-            <SummaryCard label="Waitlisted" value={String(results.filter((r) => r.awardedProgramId === null).length)} color="#b45309" />
-            <SummaryCard label="Total Students" value={String(results.length)} />
-            <SummaryCard label="Programs" value={String(programIds.length)} />
+          {/* 4 summary cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+            <SummaryCard label="Prev. Cycle Offers"  value={prevCycleOfferCount !== null ? String(prevCycleOfferCount) : '–'} color="var(--color-text-muted)" />
+            <SummaryCard label="Curr. Cycle Offers"  value={String(results.filter((r) => r.awardedProgramId !== null).length)} color="#276749" />
+            <SummaryCard label="Waitlisted"          value={String(results.filter((r) => r.awardedProgramId === null).length)} color="#b45309" />
+            <SummaryCard label="Programs"            value={String(programIds.length)} />
           </div>
 
-          {/* Filters + actions */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}>
-            <select
-              className="form-input"
-              style={{ width: 'auto', fontSize: '13px' }}
-              value={resultCategoryFilter}
-              onChange={(e) => { setResultCategoryFilter(e.target.value); setResultPage(1); }}
-            >
-              <option value="All">All Categories</option>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <span style={{ flex: 1 }} />
-            <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={() => { setResults(null); }}>
-              Reconfigure
-            </button>
-            <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>
-              ↓ Download CSV
-            </button>
-          </div>
-
-          {/* Result table — preference-centric */}
-          <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="data-table" style={{ minWidth: `${500 + maxPrefs * 220}px`, fontSize: '13px' }}>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>App ID</th>
-                    <th>Student Name</th>
-                    <th>Category</th>
-                    <th>Score</th>
-                    {Array.from({ length: maxPrefs }, (_, i) => (
-                      <React.Fragment key={i}>
-                        <th style={{ textAlign: 'center' }}>Pref {i + 1}</th>
-                        <th style={{ textAlign: 'center' }}>Pref {i + 1} Status</th>
-                      </React.Fragment>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredResults.length === 0 ? (
-                    <tr><td colSpan={5 + maxPrefs * 2} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
-                  ) : filteredResults.slice(0, 10).map((r, idx) => {
-                    const app = appMap.get(r.applicationId);
-                    const prefs = app?.lppPreferences ?? (app ? [{ lppId: app.lppPreference, preferenceOrder: 1 }] : []);
-                    const sortedPrefs = [...prefs].sort((a, b) => a.preferenceOrder - b.preferenceOrder);
-                    // preferenceOrder of the awarded program (null if not offered)
-                    const offeredPrefOrder = r.awardedProgramId
-                      ? (sortedPrefs.find((p) => p.lppId === r.awardedProgramId)?.preferenceOrder ?? null)
-                      : null;
-                    return (
-                      <tr key={r.applicationId}>
-                        <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{idx + 1}</td>
-                        <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{r.applicationId}</td>
-                        <td style={{ fontWeight: 600 }}>{r.studentName}</td>
-                        <td><span className={`badge ${CATEGORY_COLORS[r.category] ?? 'badge-default'}`} style={{ fontSize: '11px' }}>{r.category}</span></td>
-                        <td><strong>{r.compositeScore.toFixed(2)}</strong></td>
-                        {Array.from({ length: maxPrefs }, (_, i) => {
-                          const pref = sortedPrefs[i];
-                          if (!pref) return <React.Fragment key={i}><td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>—</td><td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>—</td></React.Fragment>;
-                          const progName = (lppMap.get(pref.lppId) ?? pref.lppId).replace('B.Tech ', '');
-
-                          let statusEl: React.ReactNode;
-                          if (pref.lppId === r.awardedProgramId) {
-                            // This preference was awarded
-                            statusEl = <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, background: '#f0fdf4', color: '#166534', border: '1px solid #86efac' }}>Offered</span>;
-                          } else if (offeredPrefOrder !== null && pref.preferenceOrder > offeredPrefOrder) {
-                            // Lower priority than the awarded preference → not considered
-                            statusEl = <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontStyle: 'italic' }}>Not Considered</span>;
-                          } else {
-                            // Higher priority than awarded (WL) or not offered anywhere (WL)
-                            const pr = r.programResults[pref.lppId];
-                            if (!pr || pr.status === 'None') {
-                              statusEl = <span style={{ color: 'var(--color-text-muted)' }}>—</span>;
-                            } else {
-                              statusEl = <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 600, background: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d' }}>WL #{pr.waitlistNumber}</span>;
-                            }
-                          }
-                          return (
-                            <React.Fragment key={i}>
-                              <td style={{ textAlign: 'center', fontWeight: 600 }}>{progName}</td>
-                              <td style={{ textAlign: 'center' }}>{statusEl}</td>
-                            </React.Fragment>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Sample note */}
-          <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
-            Showing top 10 of {filteredResults.length} students. Download CSV for complete data.
+          {/* Action row */}
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '24px' }}>
+            <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={() => setResults(null)}>Reconfigure</button>
+            <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>↓ Download CSV</button>
+            {onProceed && (
+              <button className="btn-primary" style={{ marginLeft: 'auto' }} onClick={onProceed}>Proceed to Approval →</button>
+            )}
           </div>
         </>
       )}

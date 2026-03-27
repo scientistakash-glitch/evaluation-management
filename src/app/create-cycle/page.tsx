@@ -355,12 +355,12 @@ export default function CreateCyclePage() {
     const isFirstCycle = cycleNumber === 1;
 
     const STAT_ROWS: { key: string; label: string; color?: string; bold?: boolean }[] = [
-      { key: 'seats',        label: 'Seats',        bold: true },
-      { key: 'released',     label: 'Released',     color: 'var(--color-text-muted)' },
-      { key: 'accepted',     label: 'Accepted',     color: '#276749', bold: true },
-      { key: 'withdrawn',    label: 'Withdrawn',    color: '#92400e', bold: true },
-      { key: 'pending',      label: 'Pending',      color: '#1d4ed8', bold: true },
-      { key: 'applications', label: 'Applications', bold: true },
+      { key: 'seats',        label: 'Seats',       bold: true },
+      { key: 'applications', label: 'Applicants',  bold: true },
+      { key: 'released',     label: 'Released',    color: 'var(--color-text-muted)' },
+      { key: 'accepted',     label: 'Accepted',    color: '#276749', bold: true },
+      { key: 'withdrawn',    label: 'Withdrawn',   color: '#92400e', bold: true },
+      { key: 'pending',      label: 'Pending',     color: '#1d4ed8', bold: true },
     ];
 
     // Get all values for one (lpp, category)
@@ -378,6 +378,19 @@ export default function CreateCyclePage() {
           Review seat allocation and offer status.
           {isFirstCycle ? ' Cycle 1 — no prior offers exist.' : ` Cycle ${cycleNumber} — offer figures from previous cycle.`}
         </p>
+
+        {/* Legend — above table */}
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#374151' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px' }}>
+            <b>Seats</b>                                            <span>Total seats available per category</span>
+            <b>Applicants</b>                                       <span>Total applications received for this program &amp; category</span>
+            <b style={{ color: 'var(--color-text-muted)' }}>Released</b>  <span>Offers sent out to applicants</span>
+            <b style={{ color: '#276749' }}>Accepted</b>           <span>Applicants who confirmed their seat</span>
+            <b style={{ color: '#92400e' }}>Withdrawn</b>          <span>Applicants who declined or exited</span>
+            <b style={{ color: '#1d4ed8' }}>Pending</b>            <span>Offers awaiting applicant response</span>
+          </div>
+          {isFirstCycle && <div style={{ marginTop: '6px', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>Offer columns show 0 for Cycle 1</div>}
+        </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
@@ -455,12 +468,6 @@ export default function CreateCyclePage() {
           </table>
         </div>
 
-        <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-          <span><span style={{ color: '#276749', fontWeight: 600 }}>Accepted</span> = offers accepted</span>
-          <span><span style={{ color: '#92400e', fontWeight: 600 }}>Withdrawn</span> = offers withdrawn</span>
-          <span><span style={{ color: '#1d4ed8', fontWeight: 600 }}>Pending</span> = awaiting response</span>
-          {isFirstCycle && <span style={{ fontStyle: 'italic' }}>Offer columns show 0 for Cycle 1</span>}
-        </div>
       </div>
     );
   }

@@ -13,6 +13,40 @@ function catSeats(total: number): Record<string, number> {
   };
 }
 
+// ── Generated B.Tech applicants (500 students, app_101–app_600) ───────────────
+
+const BTECH_GEN_FIRST = ['Aarav','Aditi','Arjun','Bhavna','Chetan','Deepak','Ekta','Gaurav','Hari','Ishaan'];
+const BTECH_GEN_LAST  = ['Sharma','Patel','Singh','Gupta','Verma','Kumar','Yadav','Jain','Mehta','Shah'];
+
+function generateBTechApplicants(): any[] {
+  const DIST: [string, number][] = [
+    ['General', 250], ['OBC', 135], ['SC', 75], ['ST', 25], ['EWS', 15],
+  ];
+  const LPPS = ['lpp_001', 'lpp_002', 'lpp_003', 'lpp_004'];
+  const apps: any[] = [];
+  let n = 101;
+  for (const [cat, count] of DIST) {
+    for (let i = 0; i < count; i++, n++) {
+      const rotated = [...LPPS.slice(n % 4), ...LPPS.slice(0, n % 4)];
+      apps.push({
+        id: `app_${n}`,
+        studentName: `${BTECH_GEN_FIRST[n % 10]} ${BTECH_GEN_LAST[Math.floor(n / 10) % 10]}`,
+        rollNumber: `JEE25${String(n).padStart(3, '0')}`,
+        dateOfBirth: '2004-06-01',
+        category: cat,
+        lppPreference: rotated[0],
+        entranceScore: 150 + (n * 37 + i * 13) % 151,
+        academicScore:  Math.round((55 + (n * 17 + i * 7) % 44) * 10) / 10,
+        interviewScore: 50 + (n * 23 + i * 11) % 51,
+        applicationDate: '2025-01-20',
+        createdAt: '2025-01-20T00:00:00Z',
+        updatedAt: '2025-01-20T00:00:00Z',
+      });
+    }
+  }
+  return apps;
+}
+
 const SEED_READONLY: Record<string, any[]> = {
   // ── PTATs ──────────────────────────────────────────────────────────────────
   'ptats.json': [
@@ -155,6 +189,8 @@ const SEED_READONLY: Record<string, any[]> = {
     { id: 'app_078', studentName: 'Deepika Rathore',    rollNumber: 'JEE24032', dateOfBirth: '2003-06-18', category: 'OBC',     lppPreference: 'lpp_003', entranceScore: 266, academicScore: 86.0, interviewScore: 78, applicationDate: '2025-01-08', createdAt: '2025-01-08T00:00:00Z', updatedAt: '2025-01-08T00:00:00Z' },
     { id: 'app_079', studentName: 'Elan Senthil',       rollNumber: 'JEE24033', dateOfBirth: '2003-09-30', category: 'General', lppPreference: 'lpp_002', entranceScore: 274, academicScore: 89.5, interviewScore: 84, applicationDate: '2025-01-12', createdAt: '2025-01-12T00:00:00Z', updatedAt: '2025-01-12T00:00:00Z' },
     { id: 'app_080', studentName: 'Fatima Shaikh',      rollNumber: 'JEE24034', dateOfBirth: '2003-12-14', category: 'OBC',     lppPreference: 'lpp_004', entranceScore: 255, academicScore: 81.0, interviewScore: 70, applicationDate: '2025-01-15', createdAt: '2025-01-15T00:00:00Z', updatedAt: '2025-01-15T00:00:00Z' },
+    // ── 500 generated B.Tech applicants (app_101–app_600) ──────────────────
+    ...generateBTechApplicants(),
   ],
 
   'criteria-sets.json': [
@@ -207,6 +243,16 @@ const BTECH_PREFS: Record<string, Pref[]> = {
   'app_079': [{ lppId: 'lpp_002', preferenceOrder: 1 }, { lppId: 'lpp_001', preferenceOrder: 2 }, { lppId: 'lpp_003', preferenceOrder: 3 }, { lppId: 'lpp_004', preferenceOrder: 4 }],
   'app_080': [{ lppId: 'lpp_004', preferenceOrder: 1 }, { lppId: 'lpp_002', preferenceOrder: 2 }, { lppId: 'lpp_001', preferenceOrder: 3 }, { lppId: 'lpp_003', preferenceOrder: 4 }],
 };
+
+// Generate preferences for app_101–app_600 (matches generateBTechApplicants rotation logic)
+{
+  const LPPS = ['lpp_001', 'lpp_002', 'lpp_003', 'lpp_004'];
+  for (let n = 101; n <= 600; n++) {
+    const rotated = [...LPPS.slice(n % 4), ...LPPS.slice(0, n % 4)];
+    const numPrefs = n % 3 === 0 ? 2 : n % 3 === 1 ? 3 : 4;
+    BTECH_PREFS[`app_${n}`] = rotated.slice(0, numPrefs).map((lppId, j) => ({ lppId, preferenceOrder: j + 1 }));
+  }
+}
 
 // Attach lppPreferences to all applications (B.Tech: multi-preference; others: single)
 for (const app of SEED_READONLY['applications.json']) {

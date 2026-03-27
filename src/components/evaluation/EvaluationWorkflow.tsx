@@ -51,8 +51,6 @@ interface Application {
   lppPreferences?: { lppId: string; preferenceOrder: number }[];
 }
 
-const PAGE_SIZE = 15;
-
 const HARDCODED_APPROVERS = [
   { name: 'Dean of Admissions',  email: 'dean@university.edu' },
   { name: 'Registrar',           email: 'registrar@university.edu' },
@@ -164,8 +162,6 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   const [approved, setApproved]     = useState(false);
   const [approving, setApproving]   = useState(false);
 
-  const [page, setPage]             = useState(1);
-  const [categoryFilter, setCategoryFilter] = useState('All');
   const [evalStep, setEvalStep]     = useState<'scores' | 'offers' | 'approval'>('scores');
 
   // ── Load from sessionStorage ──────────────────────────────────────────────
@@ -231,76 +227,22 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     studentRankMap.get(r.applicationId)!.set(r.programId, r);
   }
 
-  const categories = ['All', ...Array.from(new Set(rankRecords.map((r) => r.category))).sort()];
-
-  // Sorted student list for student-centric view (sorted by compositeScore of first record)
-  const allStudentIds = Array.from(studentRankMap.keys());
-  const filteredStudentIds = allStudentIds
-    .filter((appId) => {
-      if (categoryFilter !== 'All') {
-        const firstRec = Array.from(studentRankMap.get(appId)?.values() ?? [])[0];
-        return firstRec?.category === categoryFilter;
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      const scoreA = Array.from(studentRankMap.get(a)?.values() ?? [])[0]?.compositeScore ?? 0;
-      const scoreB = Array.from(studentRankMap.get(b)?.values() ?? [])[0]?.compositeScore ?? 0;
-      return scoreB - scoreA;
-    });
-
-  // For single strategy: flat filtered records
-  const filteredSingle = rankRecords
-    .filter((r) => categoryFilter === 'All' || r.category === categoryFilter)
-    .sort((a, b) => a.globalRank - b.globalRank);
-
-  const totalPages = isStudentCentric
-    ? Math.max(1, Math.ceil(filteredStudentIds.length / PAGE_SIZE))
-    : Math.max(1, Math.ceil(filteredSingle.length / PAGE_SIZE));
-  const pageStudentIds = filteredStudentIds.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const pageRows       = filteredSingle.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Sorted student list for CSV export
+  const allStudentIds = Array.from(studentRankMap.keys()).sort((a, b) => {
+    const scoreA = Array.from(studentRankMap.get(a)?.values() ?? [])[0]?.compositeScore ?? 0;
+    const scoreB = Array.from(studentRankMap.get(b)?.values() ?? [])[0]?.compositeScore ?? 0;
+    return scoreB - scoreA;
+  });
 
   // ── CSV ───────────────────────────────────────────────────────────────────
 
   function handleDownloadCSV() {
-    downloadCSV(filteredStudentIds, appMap, lppMap, studentRankMap, uniqueProgramIds, evaluation?.strategy ?? null);
+    downloadCSV(allStudentIds, appMap, lppMap, studentRankMap, uniqueProgramIds, evaluation?.strategy ?? null);
     showToast('CSV downloaded', 'info');
   }
 
-  // ── Summary data ──────────────────────────────────────────────────────────
-
-  function buildSummary() {
-    // One row per (programId, category) combination
-    const rows: { programId: string; programName: string; category: string; count: number; high: number; low: number; avg: number }[] = [];
-    type Key = string;
-    const groups = new Map<Key, RankRecord[]>();
-    for (const r of rankRecords) {
-      const key = `${r.programId}::${r.category}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(r);
-    }
-    for (const [key, recs] of Array.from(groups.entries())) {
-      const [programId, category] = key.split('::');
-      const scores = recs.map((r) => r.compositeScore);
-      rows.push({
-        programId,
-        programName: programId === 'all' ? 'All Programs' : (lppMap.get(programId) ?? programId),
-        category,
-        count: recs.length,
-        high: Math.max(...scores),
-        low: Math.min(...scores),
-        avg: scores.reduce((s, x) => s + x, 0) / scores.length,
-      });
-    }
-    // Sort by programId order then category
-    const catOrder = ['General', 'OBC', 'SC', 'ST', 'EWS'];
-    rows.sort((a, b) => {
-      const pi = uniqueProgramIds.indexOf(a.programId) - uniqueProgramIds.indexOf(b.programId);
-      if (pi !== 0) return pi;
-      return catOrder.indexOf(a.category) - catOrder.indexOf(b.category);
-    });
-    return rows;
-  }
+  const totalStudents = new Set(rankRecords.map((r) => r.applicationId)).size;
+  const programCount  = uniqueProgramIds.length || 1;
 
   // ── Loading / Error ───────────────────────────────────────────────────────
 
@@ -333,8 +275,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
 
   // ── Render: Rankings ─────────────────────────────────────────────────────
 
-  const summaryRows = buildSummary();
-  const tiedCount   = new Set(rankRecords.filter((r) => r.tieBreakerApplied).map((r) => r.applicationId)).size;
+  const tiedCount = new Set(rankRecords.filter((r) => r.tieBreakerApplied).map((r) => r.applicationId)).size;
 
   // Compute active stepper step: scores=scoreStep, offers=scoreStep+1, approval=scoreStep+2
   const activeStepNum = evalStep === 'scores' ? scoreStep
@@ -359,176 +300,34 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
       {evalStep === 'scores' && <>
       {generationMode === 'previous' && (
         <div style={{ marginBottom: '20px', padding: '12px 16px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '13px', color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '16px' }}>📋</span>
           <strong>Imported from previous cycle</strong> — Rankings based on the most recent completed cycle.
         </div>
       )}
 
       {/* KPI cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        <SummaryCard label="Total Students" value={String(new Set(rankRecords.map((r) => r.applicationId)).size)} />
-        <SummaryCard label="Programs Ranked" value={String(uniqueProgramIds.length || 1)} />
-        <SummaryCard label="Strategy"        value={evaluation.strategy === 'single' ? 'Single' : 'Program-wise'} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '32px' }}>
+        <SummaryCard label="Total Students"      value={String(totalStudents)} />
+        <SummaryCard label="Programs Ranked"     value={String(programCount)} />
+        <SummaryCard label="Strategy"            value={evaluation.strategy === 'single' ? 'Single' : 'Program-wise'} />
         <SummaryCard label="Tiebreakers Applied" value={String(tiedCount)} />
       </div>
 
-      {/* Merit list summary — always program × category */}
-      {summaryRows.length > 0 && (
-        <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>
-            Merit List Summary — by Program &amp; Category
+      {/* Rankings generated block */}
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '36px 48px', textAlign: 'center', maxWidth: '480px', width: '100%' }}>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '8px' }}>Rankings Generated</div>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '28px' }}>
+            All {totalStudents} students across {programCount} program{programCount !== 1 ? 's' : ''} have been scored and ranked.
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ fontSize: '13px' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left' }}>Program</th>
-                  <th>Category</th>
-                  <th>Students Ranked</th>
-                  <th>Highest Score</th>
-                  <th>Lowest Score</th>
-                  <th>Avg Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summaryRows.map((row, i) => {
-                  const prevRow = summaryRows[i - 1];
-                  const isNewProgram = !prevRow || prevRow.programId !== row.programId;
-                  return (
-                    <tr key={`${row.programId}-${row.category}`} style={{ background: isNewProgram && i > 0 ? 'var(--color-bg)' : undefined }}>
-                      <td style={{ fontWeight: isNewProgram ? 700 : 400, color: isNewProgram ? 'var(--color-primary)' : 'var(--color-text-muted)', fontSize: isNewProgram ? '13px' : '12px' }}>
-                        {isNewProgram ? row.programName : ''}
-                      </td>
-                      <td><CategoryBadge category={row.category} /></td>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.count}</td>
-                      <td style={{ textAlign: 'center', color: '#276749', fontWeight: 600 }}>{row.high.toFixed(2)}</td>
-                      <td style={{ textAlign: 'center', color: '#c53030' }}>{row.low.toFixed(2)}</td>
-                      <td style={{ textAlign: 'center' }}>{row.avg.toFixed(2)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <button className="btn-secondary" style={{ fontSize: '13px', width: '240px' }} onClick={handleDownloadCSV}>
+              ↓ Download Merit List CSV
+            </button>
+            <button className="btn-primary" style={{ width: '240px' }} onClick={() => setEvalStep('offers')}>
+              Next: Bulk Offer Release →
+            </button>
           </div>
         </div>
-      )}
-
-      {/* Download */}
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px', justifyContent: 'flex-end' }}>
-        <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>↓ Download Full CSV</button>
-      </div>
-
-      {/* Rank table — student-centric with global, category, and per-program ranks */}
-      <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
-        <div style={{ overflowX: 'auto' }}>
-          {isStudentCentric ? (
-            <table className="data-table" style={{ minWidth: `${700 + uniqueProgramIds.length * 180}px` }}>
-              <thead>
-                <tr>
-                  <th>Global Rank</th>
-                  <th>App ID</th>
-                  <th>Student Name</th>
-                  <th>Category</th>
-                  <th>Cat. Rank</th>
-                  <th>Score</th>
-                  {uniqueProgramIds.map((pid) => {
-                    const shortName = (lppMap.get(pid) ?? pid).replace('B.Tech ', '');
-                    return (
-                      <React.Fragment key={pid}>
-                        <th style={{ textAlign: 'center' }}>{shortName} Rank</th>
-                        <th style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)' }}>{shortName} TB</th>
-                      </React.Fragment>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudentIds.length === 0 ? (
-                  <tr><td colSpan={6 + uniqueProgramIds.length * 2} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
-                ) : filteredStudentIds.slice(0, 10).map((appId, rowIdx) => {
-                  const app = appMap.get(appId);
-                  const ranksByProgram = studentRankMap.get(appId) ?? new Map<string, RankRecord>();
-                  const firstRecord = Array.from(ranksByProgram.values())[0];
-                  const globalR = firstRecord?.globalRank ?? 0;
-                  const catR = firstRecord?.categoryRank ?? 0;
-                  const globalTb = firstRecord ? tbString(firstRecord, tiebreakerRules) : '';
-                  return (
-                    <tr key={appId}>
-                      <td><strong style={{ color: 'var(--color-primary)' }}>#{globalR}</strong></td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{appId}</td>
-                      <td style={{ fontWeight: 600 }}>{app?.studentName ?? appId}</td>
-                      <td><CategoryBadge category={firstRecord?.category ?? ''} /></td>
-                      <td><strong>#{catR}</strong></td>
-                      <td><strong>{firstRecord?.compositeScore.toFixed(2) ?? '—'}</strong></td>
-                      {uniqueProgramIds.map((pid) => {
-                        const rec = ranksByProgram.get(pid);
-                        const tb  = rec ? tbString(rec, tiebreakerRules) : '';
-                        return (
-                          <React.Fragment key={pid}>
-                            <td style={{ textAlign: 'center' }}>
-                              {rec ? <strong style={{ color: 'var(--color-primary)' }}>#{rec.programRank}</strong> : <span style={{ color: 'var(--color-text-muted)' }}>—</span>}
-                            </td>
-                            <td style={{ textAlign: 'center', fontSize: '11px', color: '#b45309' }}>
-                              {tb || ''}
-                            </td>
-                          </React.Fragment>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : (
-            <table className="data-table" style={{ minWidth: '700px' }}>
-              <thead>
-                <tr>
-                  <th>Global Rank</th>
-                  <th>Category Rank</th>
-                  <th>Application ID</th>
-                  <th>Student Name</th>
-                  <th>Category</th>
-                  <th>Composite Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSingle.length === 0 ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: '32px' }}>No results</td></tr>
-                ) : filteredSingle.slice(0, 10).map((r) => {
-                  const app = appMap.get(r.applicationId);
-                  const tb  = tbString(r, tiebreakerRules);
-                  const tbBadge = tb ? <div style={{ fontSize: '10px', color: '#b45309', marginTop: '3px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '4px', padding: '1px 5px', display: 'inline-block' }}>TB</div> : null;
-                  return (
-                    <tr key={r.id}>
-                      <td>
-                        <strong style={{ color: 'var(--color-primary)' }}>#{r.globalRank}</strong>
-                        {tbBadge}
-                      </td>
-                      <td>
-                        <strong>#{r.categoryRank}</strong>
-                        {tbBadge}
-                      </td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>{r.applicationId}</td>
-                      <td style={{ fontWeight: 600 }}>{app?.studentName ?? r.applicationId}</td>
-                      <td><CategoryBadge category={r.category} /></td>
-                      <td><strong>{r.compositeScore.toFixed(2)}</strong></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* Sample note */}
-      <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
-        Showing top 10 of {isStudentCentric ? filteredStudentIds.length : filteredSingle.length} students. Download CSV for complete data.
-      </div>
-
-      {/* Navigation: Next to Bulk Offers */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-        <button className="btn-primary" onClick={() => setEvalStep('offers')}>Next: Bulk Offer Release →</button>
       </div>
       </>}
 
@@ -544,10 +343,11 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
           uniqueProgramIds={uniqueProgramIds}
           lppMap={lppMap}
           appMap={appMap}
+          hasPreviousCycle={cycle.hasPreviousCycle}
+          onProceed={generationMode === 'fresh' ? () => setEvalStep('approval') : undefined}
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px' }}>
+        <div style={{ marginTop: '24px' }}>
           <button className="btn-secondary" onClick={() => setEvalStep('scores')}>← Back to Merit List</button>
-          {generationMode === 'fresh' && <button className="btn-primary" onClick={() => setEvalStep('approval')}>Next: Approval →</button>}
         </div>
       </>}
 
