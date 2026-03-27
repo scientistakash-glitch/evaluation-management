@@ -17,9 +17,11 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
         (c) =>
           c.id !== cycle.id &&
           (c.status === 'Closed' || c.status === 'Approved') &&
-          c.timeline.closingDate < cycle.timeline.startDate
+          (c.timeline.paymentPeriod?.end ?? '') < (cycle.timeline.applicationPeriod?.start ?? '')
       )
-      .sort((a, b) => b.timeline.closingDate.localeCompare(a.timeline.closingDate));
+      .sort((a, b) =>
+        (b.timeline.paymentPeriod?.end ?? '').localeCompare(a.timeline.paymentPeriod?.end ?? '')
+      );
 
     const previousCycle = previousCycles[0] ?? null;
 

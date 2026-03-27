@@ -26,8 +26,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const overlapError = validateNonOverlapping(
       {
         ptatId: updatedPtatId,
-        startDate: updatedTimeline.startDate,
-        closingDate: updatedTimeline.closingDate,
+        start: updatedTimeline.applicationPeriod?.start ?? '',
+        end: updatedTimeline.paymentPeriod?.end ?? '',
       },
       allCycles,
       params.id

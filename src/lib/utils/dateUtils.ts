@@ -1,20 +1,32 @@
+import { CycleTimeline } from '@/types/cycle';
+
+export function cycleTimelineStart(t: CycleTimeline): string {
+  return t.applicationPeriod?.start ?? '';
+}
+
+export function cycleTimelineEnd(t: CycleTimeline): string {
+  return t.paymentPeriod?.end ?? '';
+}
+
 export function cyclesOverlap(
-  a: { startDate: string; closingDate: string },
-  b: { startDate: string; closingDate: string }
+  a: { start: string; end: string },
+  b: { start: string; end: string }
 ): boolean {
-  return a.startDate <= b.closingDate && b.startDate <= a.closingDate;
+  return a.start <= b.end && b.start <= a.end;
 }
 
 export function validateNonOverlapping(
-  newCycle: { ptatId: string; startDate: string; closingDate: string },
-  existingCycles: Array<{ id?: string; ptatId: string; timeline?: { startDate: string; closingDate: string }; number?: number }>,
+  newCycle: { ptatId: string; start: string; end: string },
+  existingCycles: Array<{ id?: string; ptatId: string; timeline?: CycleTimeline; number?: number }>,
   excludeId?: string
 ): string | null {
   for (const c of existingCycles) {
     if (c.id === excludeId) continue;
     if (!c.timeline) continue;
-    if (c.ptatId === newCycle.ptatId && cyclesOverlap(newCycle, c.timeline)) {
-      return `Date range overlaps with Cycle ${c.number ?? ''} (${c.timeline.startDate} – ${c.timeline.closingDate})`;
+    const cStart = cycleTimelineStart(c.timeline);
+    const cEnd   = cycleTimelineEnd(c.timeline);
+    if (c.ptatId === newCycle.ptatId && cyclesOverlap(newCycle, { start: cStart, end: cEnd })) {
+      return `Date range overlaps with Cycle ${c.number ?? ''} (${cStart} – ${cEnd})`;
     }
   }
   return null;

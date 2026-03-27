@@ -4,7 +4,12 @@ import React, { useState, useMemo } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface FullLPP { id: string; name: string; totalSeats: number; categoryWiseSeats: Record<string, number>; }
+interface LPPSubcategory { name: string; category: string; approvedIntake: number; }
+interface FullLPP {
+  id: string; name: string; totalSeats: number;
+  categoryWiseSeats: Record<string, number>;
+  subcategories?: LPPSubcategory[];
+}
 
 interface RankRecord {
   id: string; applicationId: string; programId: string;
@@ -23,7 +28,22 @@ interface Application {
   lppPreferences?: { lppId: string; preferenceOrder: number }[];
 }
 
+// UI-facing config row (subcategory-based)
 interface OfferConfigRow {
+  programId: string;
+  programName: string;
+  categoryName: string;    // parent category group, e.g. "Resident Indian"
+  subcategoryName: string; // e.g. "Resident Indian", "Gujarati Minority"
+  approvedIntake: number;
+  committed: number;
+  availableSeats: number;
+  applicants: number;
+  eligiblePool: number;
+  offersToRelease: number;
+}
+
+// Internal row used by the release algorithm (reservation-category-based)
+interface AlgoRow {
   programId: string;
   programName: string;
   category: string;
@@ -31,13 +51,9 @@ interface OfferConfigRow {
   offersToRelease: number;
 }
 
-type OfferStatus = 'Offered' | 'Waitlisted' | 'NotConsidered' | 'None';
+type OfferStatus = 'Offered' | 'Waitlisted' | 'None';
 
-interface ProgramOfferResult {
-  status: OfferStatus;
-  waitlistNumber?: number;
-  categoryRank: number;
-}
+interface ProgramOfferResult { status: OfferStatus; waitlistNumber?: number; categoryRank: number; }
 
 interface StudentOfferResult {
   applicationId: string;
@@ -52,11 +68,7 @@ interface StudentOfferResult {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const CATEGORIES = ['General', 'OBC', 'SC', 'ST', 'EWS'];
-
-const CATEGORY_COLORS: Record<string, string> = {
-  General: 'badge-default', OBC: 'badge-warning', SC: 'badge-success', ST: 'badge-gray', EWS: 'badge-maroon',
-};
+const RESERVATION_CATEGORIES = ['General', 'OBC', 'SC', 'ST', 'EWS'];
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -77,18 +89,15 @@ interface Props {
 // ── Offer Release Algorithm ────────────────────────────────────────────────────
 
 function releaseOffers(
-  configRows: OfferConfigRow[],
+  algoRows: AlgoRow[],
   rankRecords: RankRecord[],
-  applications: Application[],
   appMap: Map<string, Application>,
 ): StudentOfferResult[] {
-  // Build remaining seats per (programId::category)
   const remaining = new Map<string, number>();
-  for (const row of configRows) {
+  for (const row of algoRows) {
     remaining.set(`${row.programId}::${row.category}`, row.offersToRelease);
   }
 
-  // Build ranked list per (programId::category) for WL calculation later
   const rankedLists = new Map<string, RankRecord[]>();
   for (const r of rankRecords) {
     const key = `${r.programId}::${r.category}`;
@@ -99,7 +108,6 @@ function releaseOffers(
     list.sort((a, b) => a.categoryRank - b.categoryRank);
   }
 
-  // Collect all unique students and sort by compositeScore DESC (globalRank ASC as tiebreak)
   const allStudentIds = Array.from(new Set(rankRecords.map((r) => r.applicationId)));
   allStudentIds.sort((a, b) => {
     const rA = rankRecords.find((r) => r.applicationId === a);
@@ -109,10 +117,8 @@ function releaseOffers(
     return (rA?.globalRank ?? 0) - (rB?.globalRank ?? 0);
   });
 
-  // Preference-sequential merit-order allocation:
-  // For each student (best score first), try preferences in order and assign to first available seat
-  const awardedProgram = new Map<string, string>();    // appId -> programId
-  const awardedPrefOrder = new Map<string, number>();  // appId -> preferenceOrder
+  const awardedProgram = new Map<string, string>();
+  const awardedPrefOrder = new Map<string, number>();
 
   for (const appId of allStudentIds) {
     const app = appMap.get(appId);
@@ -132,34 +138,26 @@ function releaseOffers(
     }
   }
 
-  // Build results
   const programIds = Array.from(new Set(rankRecords.map((r) => r.programId)));
-
   const results: StudentOfferResult[] = [];
+
   for (const appId of allStudentIds) {
     const app = appMap.get(appId);
     const offeredPid = awardedProgram.get(appId) ?? null;
     const offeredPref = awardedPrefOrder.get(appId) ?? null;
-
     const programResults: Record<string, ProgramOfferResult> = {};
 
     for (const pid of programIds) {
       const rec = rankRecords.find((r) => r.applicationId === appId && r.programId === pid);
-      if (!rec) {
-        programResults[pid] = { status: 'None', categoryRank: 0 };
-        continue;
-      }
-
+      if (!rec) { programResults[pid] = { status: 'None', categoryRank: 0 }; continue; }
       if (pid === offeredPid) {
         programResults[pid] = { status: 'Offered', categoryRank: rec.categoryRank };
       } else {
-        // WL position = count of students in same (program, category) who are NOT offered
-        // this program and have a better or equal categoryRank
         const key = `${pid}::${rec.category}`;
         const list = rankedLists.get(key) ?? [];
         let wlNum = 0;
         for (const entry of list) {
-          if (awardedProgram.get(entry.applicationId) === pid) continue; // offered here → skip
+          if (awardedProgram.get(entry.applicationId) === pid) continue;
           wlNum++;
           if (entry.applicationId === appId) break;
         }
@@ -185,48 +183,71 @@ function releaseOffers(
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankRecords, applications, studentRankMap, uniqueProgramIds, lppMap, appMap, hasPreviousCycle, onProceed }: Props) {
+export default function BulkOfferRelease({
+  cycleId, strategy, fullLpps, rankRecords, applications,
+  studentRankMap, uniqueProgramIds, lppMap, appMap, hasPreviousCycle, onProceed,
+}: Props) {
   const isSingle = strategy === 'single';
-  // After per-program generation, uniqueProgramIds always has actual program IDs
   const programIds = uniqueProgramIds.length > 0 ? uniqueProgramIds : (isSingle ? ['all'] : []);
 
-  // Build initial config rows
-  const defaultConfig = useMemo(() => {
+  // ── Build subcategory-based UI config rows ────────────────────────────────────
+  const defaultConfig = useMemo<OfferConfigRow[]>(() => {
     const rows: OfferConfigRow[] = [];
     for (const pid of programIds) {
       const lpp = fullLpps.find((l) => l.id === pid);
-      for (const cat of CATEGORIES) {
-        const seats = pid === 'all'
-          ? fullLpps.reduce((sum, l) => sum + (l.categoryWiseSeats[cat] ?? 0), 0)
-          : (lpp?.categoryWiseSeats[cat] ?? 0);
+      if (!lpp) continue;
+      const subs = lpp.subcategories ?? [];
+      const applicants = rankRecords.filter((r) => r.programId === pid).length;
+      const eligiblePool = Math.round(applicants * 0.75);
+      for (const sub of subs) {
+        const committed = Math.round(sub.approvedIntake * 0.08);
+        const availableSeats = sub.approvedIntake - committed;
         rows.push({
           programId: pid,
-          programName: pid === 'all' ? 'All Programs' : (lppMap.get(pid) ?? pid),
-          category: cat,
-          availableSeats: seats,
-          offersToRelease: seats,
+          programName: lpp.name,
+          categoryName: sub.category,
+          subcategoryName: sub.name,
+          approvedIntake: sub.approvedIntake,
+          committed,
+          availableSeats,
+          applicants,
+          eligiblePool,
+          offersToRelease: availableSeats,
+        });
+      }
+      // Fallback: if no subcategories defined, show one row per program
+      if (subs.length === 0) {
+        const availableSeats = lpp.totalSeats;
+        const committed = Math.round(availableSeats * 0.08);
+        rows.push({
+          programId: pid,
+          programName: lpp.name,
+          categoryName: '—',
+          subcategoryName: '—',
+          approvedIntake: availableSeats,
+          committed,
+          availableSeats: availableSeats - committed,
+          applicants,
+          eligiblePool,
+          offersToRelease: availableSeats - committed,
         });
       }
     }
     return rows;
-  }, [programIds, fullLpps, lppMap]);
+  }, [programIds, fullLpps, rankRecords]);
 
   const [configRows, setConfigRows] = useState<OfferConfigRow[]>(defaultConfig);
   const [results, setResults] = useState<StudentOfferResult[] | null>(null);
   const [prevCycleOfferCount, setPrevCycleOfferCount] = useState<number | null>(null);
 
-  function updateOffers(programId: string, category: string, value: number) {
+  function updateOffers(programId: string, subcategoryName: string, value: number) {
     setConfigRows((prev) =>
       prev.map((r) =>
-        r.programId === programId && r.category === category
-          ? { ...r, offersToRelease: Math.max(0, Math.min(value, r.availableSeats)) }
+        r.programId === programId && r.subcategoryName === subcategoryName
+          ? { ...r, offersToRelease: Math.max(0, Math.min(value, r.eligiblePool)) }
           : r
       )
     );
-  }
-
-  function resetDefaults() {
-    setConfigRows(defaultConfig);
   }
 
   function handleRelease() {
@@ -234,18 +255,31 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
       ? configRows.reduce((sum, r) => sum + Math.ceil(r.availableSeats * 0.9), 0)
       : null;
     setPrevCycleOfferCount(prevCount);
-    const offerResults = releaseOffers(configRows, rankRecords, applications, appMap);
+
+    // Build algo rows from reservation categories (for internal allocation algorithm)
+    const algoRows: AlgoRow[] = [];
+    for (const pid of programIds) {
+      const lpp = fullLpps.find((l) => l.id === pid);
+      if (!lpp) continue;
+      for (const cat of RESERVATION_CATEGORIES) {
+        algoRows.push({
+          programId: pid,
+          programName: lpp.name,
+          category: cat,
+          availableSeats: lpp.categoryWiseSeats[cat] ?? 0,
+          offersToRelease: lpp.categoryWiseSeats[cat] ?? 0,
+        });
+      }
+    }
+
+    const offerResults = releaseOffers(algoRows, rankRecords, appMap);
     setResults(offerResults);
 
-    // Persist to sessionStorage for home page
     const totalOffered = offerResults.filter((r) => r.awardedProgramId !== null).length;
     const totalWaitlisted = offerResults.filter((r) => r.awardedProgramId === null).length;
     try {
       sessionStorage.setItem(`cycle-${cycleId}-offers`, JSON.stringify({
-        released: totalOffered,
-        pending: totalWaitlisted,
-        accepted: 0,
-        withdrawn: 0,
+        released: totalOffered, pending: totalWaitlisted, accepted: 0, withdrawn: 0,
       }));
     } catch { /* ignore */ }
   }
@@ -253,30 +287,14 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
   // ── CSV download ─────────────────────────────────────────────────────────────
 
   function handleDownloadCSV() {
-    if (!results) return;
-    const progHeaders = programIds.map((p) => p === 'all' ? 'Status' : (lppMap.get(p) ?? p));
-    const extraHeaders = programIds[0] !== 'all' ? ['Program Offered', 'Preference #'] : [];
-    const header = ['Student Name', 'Roll No', 'Category', 'Score', ...extraHeaders, ...progHeaders];
+    const rows = configRows;
+    const header = ['Program Plan', 'Category', 'Subcategory', 'Approved Intake', 'Committed', 'Available Seats', 'Applicants', 'Eligible Pool', 'Pending Acceptance', 'Withdrawn', 'Offers to Release', 'Waitlisted for Next Cycle'];
     const lines = [header.join(',')];
-    for (const r of results) {
-      const cells = programIds.map((pid) => {
-        const pr = r.programResults[pid];
-        if (!pr || pr.status === 'None') return '—';
-        if (pr.status === 'Offered') return 'Offered';
-        return `WL #${pr.waitlistNumber}`;
-      });
-      const extraCells = programIds[0] !== 'all' ? [
-        r.awardedProgramId ? `"${lppMap.get(r.awardedProgramId) ?? r.awardedProgramId}"` : 'Waitlisted',
-        r.awardedPreferenceOrder ? `P${r.awardedPreferenceOrder}` : '—',
-      ] : [];
-      lines.push([
-        `"${r.studentName}"`,
-        r.rollNumber,
-        r.category,
-        r.compositeScore.toFixed(2),
-        ...extraCells,
-        ...cells,
-      ].join(','));
+    for (const r of rows) {
+      const pending = Math.round(r.offersToRelease * 0.3);
+      const withdrawn = Math.round(r.offersToRelease * 0.05);
+      const waitlisted = Math.max(0, r.eligiblePool - r.offersToRelease);
+      lines.push([r.programName, r.categoryName, r.subcategoryName, r.approvedIntake, r.committed, r.availableSeats, r.applicants, r.eligiblePool, pending, withdrawn, r.offersToRelease, waitlisted].join(','));
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -308,53 +326,62 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
           {/* Definitions block — above table */}
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#374151' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px' }}>
-              <b>Previous Cycle Last Rank</b><span>Category rank of the last student offered a seat in this program &amp; category in the previous cycle</span>
-              <b>Current Cycle Last Rank</b><span>Updates live — rank of the last student to receive an offer at the current Offers to Release number</span>
-              <b>Waitlisted</b><span>Applicants ranked beyond the current offer cutoff</span>
-              <b>Pending Acceptance</b><span>Indicative — offers awaiting confirmation (approx. 30%)</span>
-              <b>Withdrawn</b><span>Indicative — students who have exited the process (approx. 5%)</span>
+              <b>Approved Intake</b>        <span>Total sanctioned seats for this subcategory</span>
+              <b>Committed</b>              <span>Indicative — students who have paid the program fee (approx. 8%)</span>
+              <b>Available Seats</b>        <span>Approved Intake minus Committed seats</span>
+              <b>Applicants</b>             <span>Total ranked applicants for this program</span>
+              <b>Eligible Pool</b>          <span>Indicative — applicants meeting minimum eligibility criteria (approx. 75%)</span>
+              <b>Pending Acceptance</b>     <span>Indicative — offers awaiting confirmation (approx. 30% of Offers to Release)</span>
+              <b>Withdrawn</b>              <span>Indicative — applicants who have exited the process (approx. 5% of Offers to Release)</span>
+              <b>Waitlisted for Next Cycle</b><span>Eligible Pool minus Offers to Release — auto-calculated</span>
             </div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ fontSize: '13px' }}>
+            <table className="data-table" style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left' }}>Program</th>
-                  <th>Category</th>
-                  <th>Applicants</th>
-                  <th>Previous Cycle Last Rank</th>
-                  <th>Current Cycle Last Rank</th>
-                  <th>Avail. Seats</th>
-                  <th>Offers to Release</th>
-                  <th>Waitlisted</th>
-                  <th>Pending Acceptance</th>
-                  <th>Withdrawn</th>
+                  <th style={{ textAlign: 'left', minWidth: '130px' }}>Program Plan</th>
+                  <th style={{ textAlign: 'left', minWidth: '120px' }}>Category</th>
+                  <th style={{ textAlign: 'left', minWidth: '140px' }}>Subcategory</th>
+                  <th style={{ textAlign: 'center' }}>Approved Intake</th>
+                  <th style={{ textAlign: 'center' }}>Committed (Fee Paid)</th>
+                  <th style={{ textAlign: 'center' }}>Available Seats</th>
+                  <th style={{ textAlign: 'center' }}>Applicants</th>
+                  <th style={{ textAlign: 'center' }}>Eligible Pool</th>
+                  <th style={{ textAlign: 'center' }}>Pending Acceptance</th>
+                  <th style={{ textAlign: 'center' }}>Withdrawn</th>
+                  <th style={{ textAlign: 'center', minWidth: '120px' }}>Offers to Release</th>
+                  <th style={{ textAlign: 'center', minWidth: '130px' }}>Waitlisted for Next Cycle</th>
                 </tr>
               </thead>
               <tbody>
                 {configRows.map((row, i) => {
                   const prevRow = configRows[i - 1];
                   const isNewProgram = !prevRow || prevRow.programId !== row.programId;
-                  const applicants = rankRecords.filter((r) => r.programId === row.programId && r.category === row.category).length;
-                  const prevLastRank = hasPreviousCycle ? Math.ceil(row.availableSeats * 0.9) : null;
-                  const currList = rankRecords
-                    .filter((r) => r.programId === row.programId && r.category === row.category)
-                    .sort((a, b) => a.categoryRank - b.categoryRank);
-                  const currLastRank = row.offersToRelease > 0 ? (currList[row.offersToRelease - 1]?.categoryRank ?? null) : null;
-                  const waitlisted = Math.max(0, applicants - row.offersToRelease);
-                  const pending = Math.round(row.offersToRelease * 0.3);
+                  const isNewCategory = !prevRow || prevRow.programId !== row.programId || prevRow.categoryName !== row.categoryName;
+                  const pending   = Math.round(row.offersToRelease * 0.3);
                   const withdrawn = Math.round(row.offersToRelease * 0.05);
+                  const waitlisted = Math.max(0, row.eligiblePool - row.offersToRelease);
                   return (
-                    <tr key={`${row.programId}-${row.category}`} style={{ background: isNewProgram && i > 0 ? 'var(--color-bg)' : undefined }}>
-                      <td style={{ fontWeight: isNewProgram ? 700 : 400, color: isNewProgram ? 'var(--color-primary)' : 'var(--color-text-muted)', fontSize: isNewProgram ? '13px' : '12px' }}>
+                    <tr
+                      key={`${row.programId}-${row.subcategoryName}`}
+                      style={{ borderTop: isNewProgram && i > 0 ? '2px solid var(--color-border)' : undefined }}
+                    >
+                      <td style={{ fontWeight: isNewProgram ? 700 : 400, color: isNewProgram ? 'var(--color-primary)' : 'transparent', fontSize: '13px' }}>
                         {isNewProgram ? row.programName : ''}
                       </td>
-                      <td><span className={`badge ${CATEGORY_COLORS[row.category] ?? 'badge-default'}`} style={{ fontSize: '11px' }}>{row.category}</span></td>
-                      <td style={{ textAlign: 'center' }}>{applicants}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{prevLastRank ?? '–'}</td>
-                      <td style={{ textAlign: 'center', fontWeight: currLastRank !== null ? 600 : 400, color: currLastRank !== null ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>{currLastRank ?? '–'}</td>
+                      <td style={{ color: isNewCategory ? 'var(--color-text)' : 'transparent', fontWeight: 500 }}>
+                        {isNewCategory ? row.categoryName : ''}
+                      </td>
+                      <td style={{ color: 'var(--color-text)' }}>{row.subcategoryName}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.approvedIntake}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{row.committed}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.availableSeats}</td>
+                      <td style={{ textAlign: 'center' }}>{row.applicants}</td>
+                      <td style={{ textAlign: 'center' }}>{row.eligiblePool}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{pending}</td>
+                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{withdrawn}</td>
                       <td style={{ textAlign: 'center' }}>
                         <input
                           type="number"
@@ -362,13 +389,13 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
                           style={{ width: '80px', textAlign: 'center', padding: '4px 8px', fontSize: '13px' }}
                           value={row.offersToRelease}
                           min={0}
-                          max={row.availableSeats}
-                          onChange={(e) => updateOffers(row.programId, row.category, parseInt(e.target.value) || 0)}
+                          max={row.eligiblePool}
+                          onChange={(e) => updateOffers(row.programId, row.subcategoryName, parseInt(e.target.value) || 0)}
                         />
                       </td>
-                      <td style={{ textAlign: 'center', color: waitlisted > 0 ? '#b45309' : 'var(--color-text-muted)' }}>{waitlisted}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{pending}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{withdrawn}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 600, color: waitlisted > 0 ? '#b45309' : 'var(--color-text-muted)' }}>
+                        {waitlisted}
+                      </td>
                     </tr>
                   );
                 })}
@@ -390,15 +417,13 @@ export default function BulkOfferRelease({ cycleId, strategy, fullLpps, rankReco
       {/* Results */}
       {results && (
         <>
-          {/* 4 summary cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-            <SummaryCard label="Prev. Cycle Offers"  value={prevCycleOfferCount !== null ? String(prevCycleOfferCount) : '–'} color="var(--color-text-muted)" />
-            <SummaryCard label="Curr. Cycle Offers"  value={String(results.filter((r) => r.awardedProgramId !== null).length)} color="#276749" />
-            <SummaryCard label="Waitlisted"          value={String(results.filter((r) => r.awardedProgramId === null).length)} color="#b45309" />
-            <SummaryCard label="Programs"            value={String(programIds.length)} />
+            <SummaryCard label="Prev. Cycle Offers" value={prevCycleOfferCount !== null ? String(prevCycleOfferCount) : '–'} color="var(--color-text-muted)" />
+            <SummaryCard label="Curr. Cycle Offers" value={String(results.filter((r) => r.awardedProgramId !== null).length)} color="#276749" />
+            <SummaryCard label="Waitlisted"         value={String(results.filter((r) => r.awardedProgramId === null).length)} color="#b45309" />
+            <SummaryCard label="Programs"           value={String(programIds.length)} />
           </div>
 
-          {/* Action row */}
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '24px' }}>
             <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={() => setResults(null)}>Reconfigure</button>
             <button className="btn-secondary" style={{ fontSize: '13px' }} onClick={handleDownloadCSV}>↓ Download CSV</button>

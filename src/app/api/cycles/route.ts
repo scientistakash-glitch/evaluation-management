@@ -35,13 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Required fields missing' }, { status: 400 });
     }
 
-    if (
-      !timeline.startDate ||
-      !timeline.offerReleaseDate ||
-      !timeline.acceptanceDeadline ||
-      !timeline.paymentDeadline ||
-      !timeline.closingDate
-    ) {
+    if (!timeline.applicationPeriod?.start || !timeline.paymentPeriod?.end) {
       return NextResponse.json({ error: 'All timeline dates are required' }, { status: 400 });
     }
 
@@ -55,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Overlap validation (date range within same PTAT)
     const overlapError = validateNonOverlapping(
-      { ptatId, startDate: timeline.startDate, closingDate: timeline.closingDate },
+      { ptatId, start: timeline.applicationPeriod.start, end: timeline.paymentPeriod.end },
       existing
     );
     if (overlapError) {

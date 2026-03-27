@@ -12,7 +12,15 @@ interface LPP  {
   totalSeats: number;
   categoryWiseSeats: Record<string, number>;
 }
-interface Application { id: string; category: string; lppPreference: string; }
+
+interface CycleDateRange { start: string; end: string; }
+interface CycleTimeline {
+  applicationPeriod: CycleDateRange;
+  scoringPeriod: CycleDateRange;
+  offerReleasePeriod: CycleDateRange;
+  acceptancePeriod: CycleDateRange;
+  paymentPeriod: CycleDateRange;
+}
 
 interface TiebreakerRule {
   order: number;
@@ -24,13 +32,22 @@ interface TiebreakerRule {
 interface ProgramWeights { entrance: number; academic: number; interview: number; }
 interface ProgramConfig  { programId: string; programName: string; weights: ProgramWeights; scoresGenerated: boolean; }
 
-const ACADEMIC_YEARS = ['2024-2025', '2025-2026', '2026-2027', '2027-2028'];
-const CATEGORIES     = ['General', 'OBC', 'SC', 'ST', 'EWS'];
+const ACADEMIC_YEARS = ['2024-2025', '2025-2026', '2026-2027', '2027-2028', '2028-2029'];
 const CRITERION_OPTIONS: { id: 'entrance' | 'academic' | 'interview'; label: string }[] = [
   { id: 'entrance',  label: 'Entrance Score' },
   { id: 'academic',  label: 'Academic Score' },
   { id: 'interview', label: 'Interview Score' },
 ];
+
+const TIMELINE_EVENTS: { key: keyof CycleTimeline; label: string }[] = [
+  { key: 'applicationPeriod',  label: 'Application Period' },
+  { key: 'scoringPeriod',      label: 'Score & Merit Period' },
+  { key: 'offerReleasePeriod', label: 'Offer Release Period' },
+  { key: 'acceptancePeriod',   label: 'Acceptance Period' },
+  { key: 'paymentPeriod',      label: 'Payment Period' },
+];
+
+const EMPTY_RANGE: CycleDateRange = { start: '', end: '' };
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -40,8 +57,14 @@ export default function CreateCyclePage() {
 
   const [step, setStep] = useState(1);
 
-  // Step 1 — Academic Year + Program Group
-  const [academicYear, setAcademicYear]       = useState('');
+  // Cycle Definition sub-steps
+  const [cycleDefSubStep, setCycleDefSubStep] = useState<'group' | 'timeline'>('group');
+
+  // Step 1a — Academic Year + Program Group
+  const [academicYear, setAcademicYear] = useState(() => {
+    const yr = new Date().getFullYear();
+    return `${yr}-${yr + 1}`;
+  });
   const [ptats, setPtats]                     = useState<PTAT[]>([]);
   const [lpps,  setLpps]                      = useState<LPP[]>([]);
   const [selectedPtatId, setSelectedPtatId]   = useState('');
@@ -49,21 +72,21 @@ export default function CreateCyclePage() {
   const [loadingPtats, setLoadingPtats]       = useState(false);
   const [loadingCycleNum, setLoadingCycleNum] = useState(false);
 
-  // Step 2 — Seat Matrix
-  const [allApplications, setAllApplications] = useState<Application[]>([]);
-
-  // Step 3 — Timelines
-  const [timeline, setTimeline] = useState({
-    startDate: '', offerReleaseDate: '', acceptanceDeadline: '',
-    paymentDeadline: '', closingDate: '',
+  // Step 1b — Timeline
+  const [timeline, setTimeline] = useState<CycleTimeline>({
+    applicationPeriod:  { ...EMPTY_RANGE },
+    scoringPeriod:      { ...EMPTY_RANGE },
+    offerReleasePeriod: { ...EMPTY_RANGE },
+    acceptancePeriod:   { ...EMPTY_RANGE },
+    paymentPeriod:      { ...EMPTY_RANGE },
   });
 
-  // Step 4 — Strategy + Generation Mode
+  // Step 2 — Strategy + Generation Mode
   const [strategy, setStrategy] = useState<'single' | 'program-wise' | null>(null);
   const [generationMode, setGenerationMode] = useState<'fresh' | 'previous'>('fresh');
-  const totalSteps = generationMode === 'previous' ? 4 : 5;
+  const totalSteps = generationMode === 'previous' ? 2 : 3;
 
-  // Step 5 — Criteria & Tiebreakers (sub-stepped)
+  // Step 3 — Criteria & Tiebreakers (sub-stepped; only in fresh mode)
   const [subStep5, setSubStep5] = useState<'weights' | 'tiebreakers'>('weights');
   const [programConfigs, setProgramConfigs] = useState<ProgramConfig[]>([]);
   const [tiebreakerRules, setTiebreakerRules] = useState<TiebreakerRule[]>([
@@ -97,13 +120,6 @@ export default function CreateCyclePage() {
     }).finally(() => setLoadingCycleNum(false));
   }, [selectedPtatId, academicYear]);
 
-  // Load applications for seat matrix (once on mount)
-  useEffect(() => {
-    fetch('/api/applications')
-      .then((r) => r.json())
-      .then((data) => setAllApplications(Array.isArray(data) ? data : []));
-  }, []);
-
   // Build programConfigs when strategy or LPPs change
   useEffect(() => {
     if (!strategy) return;
@@ -117,20 +133,28 @@ export default function CreateCyclePage() {
 
   // ── Validation helpers ───────────────────────────────────────────────────────
 
-  function step1Valid() { return !!academicYear && !!selectedPtatId && cycleNumber !== null; }
-  function step2Valid() { return true; } // read-only step
-  function step3Valid() {
-    const { startDate, offerReleaseDate, acceptanceDeadline, paymentDeadline, closingDate } = timeline;
-    if (!startDate || !offerReleaseDate || !acceptanceDeadline || !paymentDeadline || !closingDate) return false;
-    return startDate <= offerReleaseDate && offerReleaseDate <= acceptanceDeadline &&
-      acceptanceDeadline <= paymentDeadline && paymentDeadline <= closingDate;
+  function step1GroupValid() { return !!academicYear && !!selectedPtatId && cycleNumber !== null; }
+
+  function timelineValid() {
+    return (Object.keys(timeline) as (keyof CycleTimeline)[]).every(
+      (key) => timeline[key].start && timeline[key].end && timeline[key].start < timeline[key].end
+    );
   }
-  function step4Valid() { return strategy !== null; }
-  function step5Valid() {
+
+  function step1Valid() { return step1GroupValid() && timelineValid(); }
+  function step2Valid() { return strategy !== null; }
+  function step3Valid() {
     if (subStep5 === 'weights') {
       return programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5);
     }
     return tiebreakerRules.length > 0;
+  }
+
+  function stepValid() {
+    if (step === 1) return step1Valid();
+    if (step === 2) return step2Valid();
+    if (step === 3) return step3Valid();
+    return false;
   }
 
   // ── Tiebreaker helpers ───────────────────────────────────────────────────────
@@ -284,9 +308,9 @@ export default function CreateCyclePage() {
   const selectedPtat = ptats.find((p) => p.id === selectedPtatId);
   const ptatLpps     = lpps.filter((l) => l.ptatId === selectedPtatId);
 
-  function renderStep1() {
+  function renderGroupSubStep() {
     return (
-      <div className="wizard-step">
+      <>
         <h2 className="step-title">Academic Year &amp; Program Group</h2>
         <p className="step-subtitle">Select the academic year and program group for this admissions cycle.</p>
 
@@ -296,7 +320,6 @@ export default function CreateCyclePage() {
               Academic Year
             </label>
             <select className="form-input" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}>
-              <option value="">— Select year —</option>
               {ACADEMIC_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
@@ -338,169 +361,106 @@ export default function CreateCyclePage() {
             )}
           </div>
         )}
-      </div>
+      </>
     );
   }
 
-  function getOfferFigures(baseSeats: number, cn: number | null) {
-    if (!cn || cn <= 1) return { released: 0, accepted: 0, withdrawn: 0, pending: 0 };
-    const released  = Math.round(baseSeats * 0.85);
-    const accepted  = Math.round(released * 0.70);
-    const withdrawn = Math.round(released * 0.05);
-    const pending   = released - accepted - withdrawn;
-    return { released, accepted, withdrawn, pending };
-  }
-
-  function renderStep2() {
-    const isFirstCycle = cycleNumber === 1;
-
-    const STAT_ROWS: { key: string; label: string; color?: string; bold?: boolean }[] = [
-      { key: 'seats',        label: 'Seats',       bold: true },
-      { key: 'applications', label: 'Applicants',  bold: true },
-      { key: 'released',     label: 'Released',    color: 'var(--color-text-muted)' },
-      { key: 'accepted',     label: 'Accepted',    color: '#276749', bold: true },
-      { key: 'withdrawn',    label: 'Withdrawn',   color: '#92400e', bold: true },
-      { key: 'pending',      label: 'Pending',     color: '#1d4ed8', bold: true },
-    ];
-
-    // Get all values for one (lpp, category)
-    function getCellData(lpp: LPP, cat: string) {
-      const seats = lpp.categoryWiseSeats?.[cat] ?? 0;
-      const { released, accepted, withdrawn, pending } = getOfferFigures(seats, cycleNumber);
-      const apps = allApplications.filter((a) => a.lppPreference === lpp.id && a.category === cat).length;
-      return { seats, released, accepted, withdrawn, pending, applications: apps };
-    }
-
+  function renderTimelineSubStep() {
+    const hasErrors = (Object.keys(timeline) as (keyof CycleTimeline)[]).some(
+      (key) => timeline[key].start && timeline[key].end && timeline[key].start >= timeline[key].end
+    );
     return (
-      <div className="wizard-step">
-        <h2 className="step-title">Seat Matrix</h2>
-        <p className="step-subtitle">
-          Review seat allocation and offer status.
-          {isFirstCycle ? ' Cycle 1 — no prior offers exist.' : ` Cycle ${cycleNumber} — offer figures from previous cycle.`}
-        </p>
-
-        {/* Legend — above table */}
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#374151' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px' }}>
-            <b>Seats</b>                                            <span>Total seats available per category</span>
-            <b>Applicants</b>                                       <span>Total applications received for this program &amp; category</span>
-            <b style={{ color: 'var(--color-text-muted)' }}>Released</b>  <span>Offers sent out to applicants</span>
-            <b style={{ color: '#276749' }}>Accepted</b>           <span>Applicants who confirmed their seat</span>
-            <b style={{ color: '#92400e' }}>Withdrawn</b>          <span>Applicants who declined or exited</span>
-            <b style={{ color: '#1d4ed8' }}>Pending</b>            <span>Offers awaiting applicant response</span>
-          </div>
-          {isFirstCycle && <div style={{ marginTop: '6px', fontStyle: 'italic', color: 'var(--color-text-muted)' }}>Offer columns show 0 for Cycle 1</div>}
-        </div>
-
+      <>
+        <h2 className="step-title">Cycle Timeline</h2>
+        <p className="step-subtitle">Set the start and end date &amp; time for each phase of this admissions cycle.</p>
         <div style={{ overflowX: 'auto' }}>
-          <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
+          <table className="data-table" style={{ fontSize: '13px', width: '100%', minWidth: '600px' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', minWidth: '130px' }}>Program</th>
-                <th style={{ textAlign: 'left', minWidth: '90px' }}></th>
-                {CATEGORIES.map((cat) => (
-                  <th key={cat} style={{ textAlign: 'center', minWidth: '70px' }}>{cat}</th>
-                ))}
-                <th style={{ textAlign: 'center', minWidth: '65px' }}>Total</th>
+                <th style={{ textAlign: 'left', minWidth: '180px' }}>Phase</th>
+                <th style={{ textAlign: 'left', minWidth: '220px' }}>Start</th>
+                <th style={{ width: '24px' }}></th>
+                <th style={{ textAlign: 'left', minWidth: '220px' }}>End</th>
               </tr>
             </thead>
             <tbody>
-              {ptatLpps.map((lpp, lppIdx) => {
-                const catData = CATEGORIES.map((cat) => getCellData(lpp, cat));
-                return STAT_ROWS.map((stat, statIdx) => {
-                  const isFirst = statIdx === 0;
-                  const isLast  = statIdx === STAT_ROWS.length - 1;
-                  const total   = catData.reduce((s, d) => s + (d[stat.key as keyof typeof d] as number), 0);
-                  return (
-                    <tr
-                      key={`${lpp.id}-${stat.key}`}
-                      style={{
-                        borderTop: isFirst && lppIdx > 0 ? '2px solid var(--color-border)' : undefined,
-                        background: isFirst ? 'var(--color-bg)' : undefined,
-                      }}
-                    >
-                      {/* Program name — only on first sub-row */}
-                      <td style={{ fontWeight: 700, color: 'var(--color-primary)', verticalAlign: 'middle' }}>
-                        {isFirst ? lpp.name : ''}
-                      </td>
-                      {/* Stat label */}
-                      <td style={{ color: stat.color ?? 'var(--color-text-muted)', fontSize: '12px', paddingLeft: isFirst ? undefined : '16px' }}>
-                        {stat.label}
-                      </td>
-                      {/* Per-category values */}
-                      {catData.map((d, ci) => (
-                        <td key={CATEGORIES[ci]} style={{ textAlign: 'center', color: stat.color, fontWeight: stat.bold ? 600 : 400 }}>
-                          {d[stat.key as keyof typeof d]}
-                        </td>
-                      ))}
-                      {/* Total */}
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: stat.color }}>{total}</td>
-                    </tr>
-                  );
-                });
-              })}
-
-              {/* Grand totals */}
-              {STAT_ROWS.map((stat, statIdx) => {
-                const isFirst = statIdx === 0;
-                const catTotals = CATEGORIES.map((cat) =>
-                  ptatLpps.reduce((s, lpp) => s + (getCellData(lpp, cat)[stat.key as keyof ReturnType<typeof getCellData>] as number), 0)
-                );
-                const grandTotal = catTotals.reduce((s, v) => s + v, 0);
+              {TIMELINE_EVENTS.map(({ key, label }) => {
+                const range = timeline[key];
+                const invalid = range.start && range.end && range.start >= range.end;
                 return (
-                  <tr
-                    key={`total-${stat.key}`}
-                    style={{
-                      borderTop: isFirst ? '2px solid var(--color-border)' : undefined,
-                      background: 'var(--color-primary-bg)',
-                    }}
-                  >
-                    <td style={{ fontWeight: 700 }}>{isFirst ? 'Total' : ''}</td>
-                    <td style={{ color: stat.color ?? 'var(--color-text-muted)', fontSize: '12px', paddingLeft: isFirst ? undefined : '16px' }}>{stat.label}</td>
-                    {catTotals.map((v, ci) => (
-                      <td key={CATEGORIES[ci]} style={{ textAlign: 'center', color: stat.color, fontWeight: stat.bold ? 600 : 400 }}>{v}</td>
-                    ))}
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: stat.color }}>{grandTotal}</td>
+                  <tr key={key}>
+                    <td style={{ fontWeight: 500 }}>{label}</td>
+                    <td>
+                      <input
+                        type="datetime-local"
+                        className="form-input"
+                        style={{ fontSize: '13px', borderColor: invalid ? '#e53e3e' : undefined }}
+                        value={range.start}
+                        onChange={(e) => setTimeline((t) => ({ ...t, [key]: { ...t[key], start: e.target.value } }))}
+                      />
+                    </td>
+                    <td style={{ textAlign: 'center', color: '#9ca3af', fontWeight: 600 }}>→</td>
+                    <td>
+                      <input
+                        type="datetime-local"
+                        className="form-input"
+                        style={{ fontSize: '13px', borderColor: invalid ? '#e53e3e' : undefined }}
+                        value={range.end}
+                        onChange={(e) => setTimeline((t) => ({ ...t, [key]: { ...t[key], end: e.target.value } }))}
+                      />
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-
-      </div>
+        {hasErrors && (
+          <div style={{ marginTop: '10px', color: '#e53e3e', fontSize: '13px' }}>End date must be after start date for each phase.</div>
+        )}
+      </>
     );
   }
 
-  function renderStep3() {
-    const fields: { key: keyof typeof timeline; label: string }[] = [
-      { key: 'startDate',          label: 'Cycle Start Date' },
-      { key: 'offerReleaseDate',   label: 'Offer Release Date' },
-      { key: 'acceptanceDeadline', label: 'Offer Acceptance Deadline' },
-      { key: 'paymentDeadline',    label: 'Payment Deadline' },
-      { key: 'closingDate',        label: 'Cycle Closing Date' },
-    ];
+  function renderStep1() {
     return (
       <div className="wizard-step">
-        <h2 className="step-title">Cycle Timelines</h2>
-        <p className="step-subtitle">Set key dates for this admissions cycle. Dates must be in chronological order.</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxWidth: '420px' }}>
-          {fields.map(({ key, label }) => (
-            <div key={key}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '5px' }}>{label}</label>
-              <input type="date" className="form-input" value={timeline[key]}
-                onChange={(e) => setTimeline((t) => ({ ...t, [key]: e.target.value }))} />
-            </div>
-          ))}
+        {/* Mini sub-stepper */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0', marginBottom: '24px', padding: '12px 16px', background: 'var(--color-bg)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
+          {(['group', 'timeline'] as const).map((sub, i) => {
+            const isDone   = sub === 'group' && cycleDefSubStep === 'timeline';
+            const isActive = sub === cycleDefSubStep;
+            const label    = sub === 'group' ? 'A — Year & Group' : 'B — Timeline';
+            return (
+              <React.Fragment key={sub}>
+                {i > 0 && (
+                  <div style={{ flex: 1, height: '2px', background: isDone ? 'var(--color-primary)' : 'var(--color-border)', margin: '0 8px' }} />
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '11px', fontWeight: 700, flexShrink: 0,
+                    background: isDone ? 'var(--color-primary)' : isActive ? 'var(--color-primary)' : 'var(--color-border)',
+                    color: isDone || isActive ? 'white' : 'var(--color-text-muted)',
+                  }}>
+                    {isDone ? '✓' : (i + 1)}
+                  </div>
+                  <span style={{ fontSize: '13px', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--color-primary)' : isDone ? 'var(--color-text)' : 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                    {label}
+                  </span>
+                </div>
+              </React.Fragment>
+            );
+          })}
         </div>
-        {timeline.startDate && timeline.closingDate && !step3Valid() && (
-          <div style={{ marginTop: '12px', color: '#e53e3e', fontSize: '13px' }}>Dates must be in chronological order.</div>
-        )}
+
+        {cycleDefSubStep === 'group'    && renderGroupSubStep()}
+        {cycleDefSubStep === 'timeline' && renderTimelineSubStep()}
       </div>
     );
   }
 
-  function renderStep4() {
+  function renderStep2() {
     const hasPrev = cycleNumber !== null && cycleNumber > 1;
     return (
       <div className="wizard-step">
@@ -562,7 +522,7 @@ export default function CreateCyclePage() {
     );
   }
 
-  function renderStep5() {
+  function renderStep3() {
     return (
       <div className="wizard-step">
         <h2 className="step-title">Criteria &amp; Tiebreakers</h2>
@@ -675,20 +635,13 @@ export default function CreateCyclePage() {
     );
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────────
+  // ── Progress bar labels ───────────────────────────────────────────────────────
 
-  function stepValid() {
-    if (step === 1) return step1Valid();
-    if (step === 2) return step2Valid();
-    if (step === 3) return step3Valid();
-    if (step === 4) return step4Valid();
-    if (step === 5) return step5Valid();
-    return false;
-  }
+  const wizardStepLabels = generationMode === 'previous'
+    ? ['Cycle Definition', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Approval']
+    : ['Cycle Definition', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Approval'];
 
-  const stepLabels = generationMode === 'previous'
-    ? ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Approval']
-    : ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Approval'];
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="page-container">
@@ -699,7 +652,7 @@ export default function CreateCyclePage() {
 
       {/* Progress indicator */}
       <div className="wizard-progress">
-        {stepLabels.map((label, i) => {
+        {wizardStepLabels.map((label, i) => {
           const n = i + 1;
           const state = n < step ? 'done' : n === step ? 'active' : 'pending';
           return (
@@ -708,19 +661,17 @@ export default function CreateCyclePage() {
                 <div className="step-circle">{n < step ? '✓' : n}</div>
                 <div className="step-label">{label}</div>
               </div>
-              {i < stepLabels.length - 1 && <div className={`step-connector${n < step ? ' done' : ''}`} />}
+              {i < wizardStepLabels.length - 1 && <div className={`step-connector${n < step ? ' done' : ''}`} />}
             </React.Fragment>
           );
         })}
       </div>
 
       {/* Content */}
-      <div className="wizard-card" style={step === 2 ? { maxWidth: '980px' } : undefined}>
+      <div className="wizard-card">
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
-        {step === 5 && renderStep5()}
 
         {error && (
           <div style={{ marginTop: '16px', padding: '12px 16px', background: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '8px', color: '#c53030', fontSize: '14px' }}>
@@ -729,22 +680,32 @@ export default function CreateCyclePage() {
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '32px' }}>
+          {/* Back button */}
           <button
             className="btn-secondary"
-            disabled={step === 1 || submitting || generating}
+            disabled={(step === 1 && cycleDefSubStep === 'group') || submitting || generating}
             onClick={() => {
-              if (step === 5 && subStep5 === 'tiebreakers') {
+              if (step === 1 && cycleDefSubStep === 'timeline') {
+                setCycleDefSubStep('group');
+              } else if (step === 3 && subStep5 === 'tiebreakers') {
                 setSubStep5('weights');
               } else {
-                if (step === 5) setSubStep5('weights');
+                if (step === 3) setSubStep5('weights');
+                if (step === 2) setCycleDefSubStep('timeline');
                 setStep((s) => s - 1);
               }
             }}
           >
             ← Back
           </button>
-          {step === 5 && subStep5 === 'weights' ? (
-            <button className="btn-primary" onClick={() => setSubStep5('tiebreakers')} disabled={!step5Valid()}>
+
+          {/* Next / Submit */}
+          {step === 1 && cycleDefSubStep === 'group' ? (
+            <button className="btn-primary" onClick={() => setCycleDefSubStep('timeline')} disabled={!step1GroupValid()}>
+              Next: Timeline →
+            </button>
+          ) : step === 3 && subStep5 === 'weights' ? (
+            <button className="btn-primary" onClick={() => setSubStep5('tiebreakers')} disabled={!programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5)}>
               Next: Tiebreakers →
             </button>
           ) : step < totalSteps ? (

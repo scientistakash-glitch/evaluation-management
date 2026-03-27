@@ -21,8 +21,8 @@ export default function OverviewTab({ cycle, ptat, lpp }: OverviewTabProps) {
       label: 'Programs',
       value: lpp ? `${lpp.name} (${lpp.code})` : cycle.lppIds.join(', '),
     },
-    { label: 'Start Date', value: cycle.timeline?.startDate ?? '' },
-    { label: 'Closing Date', value: cycle.timeline?.closingDate ?? '' },
+    { label: 'Application Start', value: cycle.timeline?.applicationPeriod?.start ?? '' },
+    { label: 'Payment End', value: cycle.timeline?.paymentPeriod?.end ?? '' },
     { label: 'Created At', value: new Date(cycle.createdAt).toLocaleDateString() },
   ];
 
