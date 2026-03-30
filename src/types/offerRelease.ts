@@ -31,6 +31,9 @@ export interface StudentOfferResult {
   cycleAllotmentType?: 'Fresh' | 'Upgraded' | 'StatusQuo' | 'Waitlisted';
   upgradedFromProgramId?: string;
   upgradedFromCycleId?: string;
+  previousProgramFee?: number;
+  newProgramFee?: number;
+  feeDelta?: number;
 }
 
 export interface OfferRelease {

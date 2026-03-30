@@ -30,14 +30,6 @@ const CRITERION_OPTIONS: { id: 'entrance' | 'academic' | 'interview'; label: str
   { id: 'interview', label: 'Interview Score' },
 ];
 
-interface InstallmentRow { pct: number; amount: number; dueDate: string; }
-const FEE_AMOUNT = 731500;
-const INSTALLMENT_PLANS: { id: string; label: string; splits: number[] }[] = [
-  { id: 'INSTA_1', label: 'INSTA 1', splits: [100] },
-  { id: 'INSTA_2', label: 'INSTA 2', splits: [50, 50] },
-  { id: 'INSTA_3', label: 'INSTA 3', splits: [30, 30, 40] },
-];
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function CreateCyclePage() {
@@ -63,27 +55,13 @@ export default function CreateCyclePage() {
   const [withdrawalWithRefund,    setWithdrawalWithRefund]    = useState('');
   const [withdrawalWithoutRefund, setWithdrawalWithoutRefund] = useState('');
 
-  // Step 1d — Fee Date Definition
-  const [installmentPlanId, setInstallmentPlanId] = useState('');
-  const [installmentRows,   setInstallmentRows]   = useState<InstallmentRow[]>([]);
-
-  function selectInstallmentPlan(planId: string) {
-    setInstallmentPlanId(planId);
-    const plan = INSTALLMENT_PLANS.find((p) => p.id === planId);
-    if (!plan) { setInstallmentRows([]); return; }
-    setInstallmentRows(plan.splits.map((pct) => ({
-      pct,
-      amount: Math.round((FEE_AMOUNT * pct) / 100),
-      dueDate: '',
-    })));
-  }
-
-  // Step 2 — Strategy + Generation Mode
+  // Step 3 — Strategy + Generation Mode
   const [strategy, setStrategy] = useState<'single' | 'program-wise' | null>(null);
   const [generationMode, setGenerationMode] = useState<'fresh' | 'previous'>('fresh');
-  const totalSteps = generationMode === 'previous' ? 4 : 5;
+  // create-cycle wizard steps (1=Year & Group, 2=Cycle Dates, 3=Strategy, 4=Criteria & TB)
+  const totalSteps = generationMode === 'previous' ? 3 : 4;
 
-  // Step 3 — Criteria & Tiebreakers (sub-stepped; only in fresh mode)
+  // Step 4 — Criteria & Tiebreakers (sub-stepped; only in fresh mode)
   const [subStep5, setSubStep5] = useState<'weights' | 'tiebreakers'>('weights');
   const [programConfigs, setProgramConfigs] = useState<ProgramConfig[]>([]);
   const [tiebreakerRules, setTiebreakerRules] = useState<TiebreakerRule[]>([
@@ -128,8 +106,6 @@ export default function CreateCyclePage() {
       if (d.selectedPtatId)          setSelectedPtatId(d.selectedPtatId);
       if (d.withdrawalWithRefund)    setWithdrawalWithRefund(d.withdrawalWithRefund);
       if (d.withdrawalWithoutRefund) setWithdrawalWithoutRefund(d.withdrawalWithoutRefund);
-      if (d.installmentPlanId)       setInstallmentPlanId(d.installmentPlanId);
-      if (d.installmentRows)         setInstallmentRows(d.installmentRows);
       if (d.strategy)                setStrategy(d.strategy);
       if (d.generationMode)          setGenerationMode(d.generationMode);
       if (d.tiebreakerRules?.length) setTiebreakerRules(d.tiebreakerRules);
@@ -155,11 +131,8 @@ export default function CreateCyclePage() {
     return !!withdrawalWithRefund && !!withdrawalWithoutRefund
       && withdrawalWithoutRefund >= withdrawalWithRefund;
   }
-  function feeDatesValid() {
-    return !!installmentPlanId && installmentRows.every((r) => !!r.dueDate);
-  }
-  function step2Valid() { return strategy !== null; }
-  function step3Valid() {
+  function step3Valid() { return strategy !== null; }
+  function step4Valid() {
     if (subStep5 === 'weights') {
       return programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5);
     }
@@ -169,9 +142,8 @@ export default function CreateCyclePage() {
   function stepValid() {
     if (step === 1) return step1GroupValid();
     if (step === 2) return cycleDatesValid();
-    if (step === 3) return feeDatesValid();
-    if (step === 4) return step2Valid();
-    if (step === 5) return step3Valid();
+    if (step === 3) return step3Valid();
+    if (step === 4) return step4Valid();
     return false;
   }
 
@@ -220,7 +192,6 @@ export default function CreateCyclePage() {
       localStorage.setItem('create-cycle-draft', JSON.stringify({
         step, academicYear, selectedPtatId,
         withdrawalWithRefund, withdrawalWithoutRefund,
-        installmentPlanId, installmentRows,
         strategy, generationMode, tiebreakerRules,
       }));
       showToast('Draft saved', 'success');
@@ -477,114 +448,6 @@ export default function CreateCyclePage() {
     );
   }
 
-  function renderFeeDatesSubStep() {
-    const selectedPlan = INSTALLMENT_PLANS.find((p) => p.id === installmentPlanId);
-    return (
-      <>
-        <h2 className="step-title">Fee Date Definition</h2>
-        <p className="step-subtitle">Select an installment plan and configure payment due dates.</p>
-
-        <div style={{ marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '6px' }}>
-            * Installment Plan
-          </label>
-          <select
-            className="form-input"
-            value={installmentPlanId}
-            onChange={(e) => selectInstallmentPlan(e.target.value)}
-          >
-            <option value="">— Select installment plan —</option>
-            {INSTALLMENT_PLANS.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </select>
-        </div>
-
-        {selectedPlan && (
-          <>
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '10px' }}>Fee Information</div>
-              <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th>CATEGORY</th>
-                    <th>QUOTA</th>
-                    <th>CURRENCY TYPE</th>
-                    <th>FEE AMOUNT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Domestic</td>
-                    <td>General</td>
-                    <td>INR</td>
-                    <td>{FEE_AMOUNT.toLocaleString('en-IN')}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 700, marginBottom: '10px' }}>Installments</div>
-              <table className="data-table" style={{ fontSize: '13px', width: '100%' }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: '40px' }}>#</th>
-                    <th>PERCENTAGE</th>
-                    <th>AMOUNT</th>
-                    <th>DUE DATE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {installmentRows.map((row, idx) => (
-                    <tr key={idx}>
-                      <td>{idx + 1}</td>
-                      <td>
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={row.pct.toFixed(2)}
-                          readOnly
-                          style={{ background: 'var(--color-bg)', color: 'var(--color-text-muted)', cursor: 'default', width: '100px' }}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          className="form-input"
-                          value={row.amount}
-                          style={{ width: '140px' }}
-                          onChange={(e) => setInstallmentRows((prev) =>
-                            prev.map((r, i) => i === idx ? {
-                              ...r,
-                              amount: Number(e.target.value),
-                              pct: parseFloat(((Number(e.target.value) / FEE_AMOUNT) * 100).toFixed(2)),
-                            } : r)
-                          )}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="datetime-local"
-                          className="form-input"
-                          value={row.dueDate}
-                          style={{ width: '200px' }}
-                          onChange={(e) => setInstallmentRows((prev) =>
-                            prev.map((r, i) => i === idx ? { ...r, dueDate: e.target.value } : r)
-                          )}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </>
-    );
-  }
-
   function renderStep1() {
     return <div className="wizard-step">{renderGroupSubStep()}</div>;
   }
@@ -594,10 +457,6 @@ export default function CreateCyclePage() {
   }
 
   function renderStep3() {
-    return <div className="wizard-step">{renderFeeDatesSubStep()}</div>;
-  }
-
-  function renderStep4() {
     const hasPrev = cycleNumber !== null && cycleNumber > 1;
     return (
       <div className="wizard-step">
@@ -659,7 +518,7 @@ export default function CreateCyclePage() {
     );
   }
 
-  function renderStep5() {
+  function renderStep4() {
     return (
       <div className="wizard-step">
         <h2 className="step-title">Criteria &amp; Tiebreakers</h2>
@@ -774,9 +633,10 @@ export default function CreateCyclePage() {
 
   // ── Progress bar labels ───────────────────────────────────────────────────────
 
+  // Full combined labels (create-cycle + evaluation) — all visible from step 1
   const wizardStepLabels = generationMode === 'previous'
-    ? ['Year & Group', 'Cycle Dates', 'Fee Dates', 'Strategy']
-    : ['Year & Group', 'Cycle Dates', 'Fee Dates', 'Strategy', 'Criteria & TB'];
+    ? ['Year & Group', 'Cycle Dates', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Fee Config', 'Approval']
+    : ['Year & Group', 'Cycle Dates', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Fee Config', 'Approval'];
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -810,7 +670,6 @@ export default function CreateCyclePage() {
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
-        {step === 5 && renderStep5()}
 
         {error && (
           <div style={{ marginTop: '16px', padding: '12px 16px', background: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '8px', color: '#c53030', fontSize: '14px' }}>
@@ -825,7 +684,7 @@ export default function CreateCyclePage() {
             className="btn-secondary"
             disabled={step === 1 || submitting || generating}
             onClick={() => {
-              if (step === 5 && subStep5 === 'tiebreakers') { setSubStep5('weights'); return; }
+              if (step === 4 && subStep5 === 'tiebreakers') { setSubStep5('weights'); return; }
               setStep((s) => s - 1);
             }}
           >
@@ -842,7 +701,7 @@ export default function CreateCyclePage() {
           </div>
 
           {/* Next / Submit */}
-          {step === 5 && subStep5 === 'weights' ? (
+          {step === 4 && subStep5 === 'weights' ? (
             <button className="btn-primary" onClick={() => setSubStep5('tiebreakers')} disabled={!programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5)}>
               Next: Tiebreakers →
             </button>

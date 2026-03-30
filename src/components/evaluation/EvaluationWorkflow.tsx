@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/common/ToastContext';
 import BulkOfferRelease from './BulkOfferRelease';
+import FeeConfig from './FeeConfig';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ interface Cycle {
 
 interface PTAT { id: string; name: string; }
 interface LPP  { id: string; name: string; }
-interface FullLPP { id: string; name: string; totalSeats: number; categoryWiseSeats: Record<string, number>; }
+interface FullLPP { id: string; name: string; totalSeats: number; fee: number; categoryWiseSeats: Record<string, number>; }
 
 interface TiebreakerRule { order: number; criterionId: string; criterionName: string; direction: 'DESC' | 'ASC'; }
 interface ProgramWeights { entrance: number; academic: number; interview: number; }
@@ -117,8 +118,8 @@ function downloadCSV(
 
 function WizardStepper({ activeStep, generationMode }: { activeStep: number; generationMode: 'fresh' | 'previous' }) {
   const labels = generationMode === 'previous'
-    ? ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Approval']
-    : ['Year & Group', 'Seat Matrix', 'Timelines', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Approval'];
+    ? ['Year & Group', 'Cycle Dates', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Fee Config', 'Approval']
+    : ['Year & Group', 'Cycle Dates', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Fee Config', 'Approval'];
   return (
     <div className="wizard-progress">
       {labels.map((label, i) => {
@@ -162,43 +163,43 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   const [approved, setApproved]     = useState(false);
   const [approving, setApproving]   = useState(false);
 
-  const [evalStep, setEvalStep]     = useState<'scores' | 'offers' | 'approval'>('scores');
+  const [evalStep, setEvalStep]     = useState<'scores' | 'offers' | 'feeConfig' | 'approval'>('scores');
 
   // ── Load from sessionStorage ──────────────────────────────────────────────
 
   useEffect(() => {
     async function load() {
-      // 1. Try sessionStorage first
-      let foundInSession = false;
+      // 1. Try sessionStorage for cached auxiliary data (fast initial render)
+      let sessionData: {
+        cycle?: Cycle; evaluation?: Evaluation; ptat?: PTAT | null;
+        lpps?: FullLPP[]; generationMode?: string; rankRecords?: RankRecord[];
+      } | null = null;
+      let sessionEvalId: string | undefined;
       try {
         const stored = sessionStorage.getItem(`cycle-${cycleId}`);
         if (stored) {
-          foundInSession = true;
-          const parsed = JSON.parse(stored);
-          setCycle(parsed.cycle);
-          setEvaluation(parsed.evaluation);
-          setPtat(parsed.ptat ?? null);
-          setLpps(parsed.lpps ?? []);
-          setFullLpps(parsed.lpps ?? []);
-          setGenerationMode(parsed.generationMode ?? 'fresh');
-          setApproved(parsed.evaluation?.status === 'Approved');
-          if (parsed.evaluation?.status === 'Approved') setEvalStep('approval');
-          if (Array.isArray(parsed.rankRecords)) setRankRecords(parsed.rankRecords);
+          sessionData = JSON.parse(stored);
+          sessionEvalId = sessionData!.evaluation?.id;
+          if (sessionData!.cycle)         setCycle(sessionData!.cycle);
+          if (sessionData!.ptat != null)  setPtat(sessionData!.ptat);
+          if (sessionData!.lpps)          { setLpps(sessionData!.lpps); setFullLpps(sessionData!.lpps); }
+          if (sessionData!.generationMode) setGenerationMode(sessionData!.generationMode as 'fresh' | 'previous');
+          if (Array.isArray(sessionData!.rankRecords)) setRankRecords(sessionData!.rankRecords);
         }
       } catch { /* ignore */ }
 
-      // 2. If not in sessionStorage, fetch from API
-      if (!foundInSession) {
-        try {
+      // 2. Always fetch from server — ensures evaluation ID is never stale
+      try {
+        // Fetch cycle + ptat + lpps only if not already in session
+        if (!sessionData?.cycle) {
           const cycleRes = await fetch(`/api/cycles/${cycleId}`);
           if (!cycleRes.ok) { setLoadError('Cycle not found.'); setLoaded(true); return; }
           const cycleData = await cycleRes.json();
           setCycle(cycleData);
 
-          const [ptatsRes, lppsRes, evalsRes] = await Promise.all([
+          const [ptatsRes, lppsRes] = await Promise.all([
             fetch('/api/ptats'),
             fetch(`/api/lpps?ptatId=${cycleData.ptatId}`),
-            fetch(`/api/evaluations?cycleId=${cycleId}`),
           ]);
           if (ptatsRes.ok) {
             const ptats = await ptatsRes.json();
@@ -209,24 +210,42 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
             setLpps(lppsData);
             setFullLpps(lppsData);
           }
-          if (evalsRes.ok) {
-            const evals = await evalsRes.json();
-            const ev = Array.isArray(evals) && evals.length > 0 ? evals[0] : null;
-            if (ev) {
-              setEvaluation(ev);
-              setApproved(ev.status === 'Approved');
-              if (ev.status === 'Approved') setEvalStep('approval');
+        }
+
+        // Always fetch evaluation from server (prevents stale session → 404 on approval)
+        const evalsRes = await fetch(`/api/evaluations?cycleId=${cycleId}`);
+        if (evalsRes.ok) {
+          const evals = await evalsRes.json();
+          const ev = Array.isArray(evals) && evals.length > 0 ? evals[0] : null;
+          if (ev) {
+            setEvaluation(ev);
+            setApproved(ev.status === 'Approved');
+            if (ev.status === 'Approved') setEvalStep('approval');
+            // Fetch rank records from server if evaluation changed or not cached
+            if (!sessionData?.rankRecords?.length || sessionEvalId !== ev.id) {
               const rankRes = await fetch(`/api/rank-records?evaluationId=${ev.id}`);
               if (rankRes.ok) {
                 const records = await rankRes.json();
-                setRankRecords(Array.isArray(records) ? records : []);
+                if (Array.isArray(records) && records.length > 0) setRankRecords(records);
               }
             }
+          } else {
+            // Server has no evaluation for this cycle — clear stale session entry
+            setEvaluation(null);
+            try { sessionStorage.removeItem(`cycle-${cycleId}`); } catch { /* ignore */ }
           }
-        } catch {
+        }
+      } catch {
+        // API unreachable — fall back to session data if available
+        if (!sessionData) {
           setLoadError('Failed to load cycle data.');
           setLoaded(true);
           return;
+        }
+        if (sessionData.evaluation) {
+          setEvaluation(sessionData.evaluation);
+          setApproved(sessionData.evaluation.status === 'Approved');
+          if (sessionData.evaluation.status === 'Approved') setEvalStep('approval');
         }
       }
 
@@ -344,21 +363,24 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
 
   // ── Render: Not Generated ─────────────────────────────────────────────────
 
-  // Stepper step: pre-gen = Score & Offers step; post-gen depends on approval state
-  const scoreStep = generationMode === 'previous' ? 5 : 6;
-  const approvalStep = generationMode === 'previous' ? 6 : 7;
+  // Stepper step indices (1-based, matching combined wizard labels)
+  // previous: [Year&Group, Cycle Dates, Strategy, Scores&Merit, Bulk Offers, Fee Config, Approval] = 7 steps
+  // fresh:    [Year&Group, Cycle Dates, Strategy, Criteria&TB, Scores&Merit, Bulk Offers, Fee Config, Approval] = 8 steps
+  const scoreStep    = generationMode === 'previous' ? 4 : 5;
+  const approvalStep = generationMode === 'previous' ? 7 : 8;
 
   // ── Render: Rankings ─────────────────────────────────────────────────────
 
   const tiedCount = new Set(rankRecords.filter((r) => r.tieBreakerApplied).map((r) => r.applicationId)).size;
 
-  // Compute active stepper step: scores=scoreStep, offers=scoreStep+1, approval=scoreStep+2
+  // Compute active stepper step: scores=scoreStep, offers=scoreStep+1, feeConfig=scoreStep+2, approval=approvalStep
   const totalSteps = generationMode === 'previous' ? 7 : 8;
   const activeStepNum = approved
     ? totalSteps + 1   // all steps show as "done"
-    : evalStep === 'scores' ? scoreStep
-    : evalStep === 'offers' ? scoreStep + 1
-    : scoreStep + 2;
+    : evalStep === 'scores'    ? scoreStep
+    : evalStep === 'offers'    ? scoreStep + 1
+    : evalStep === 'feeConfig' ? scoreStep + 2
+    : approvalStep;
 
   return (
     <div className="page-container">
@@ -422,14 +444,22 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
           lppMap={lppMap}
           appMap={appMap}
           hasPreviousCycle={cycle.hasPreviousCycle}
-          onProceed={() => setEvalStep('approval')}
+          onProceed={() => setEvalStep('feeConfig')}
         />
         <div style={{ marginTop: '24px' }}>
           <button className="btn-secondary" onClick={() => setEvalStep('scores')}>← Back to Merit List</button>
         </div>
       </>}
 
-      {/* ════════════ STEP 8: Approval ════════════ */}
+      {/* ════════════ STEP 7/8: Fee Config ════════════ */}
+      {evalStep === 'feeConfig' && <>
+        <FeeConfig cycleId={cycleId} onSaved={() => setEvalStep('approval')} />
+        <div style={{ marginTop: '8px' }}>
+          <button className="btn-secondary" onClick={() => setEvalStep('offers')}>← Back to Bulk Offers</button>
+        </div>
+      </>}
+
+      {/* ════════════ STEP 8/9: Approval ════════════ */}
       {evalStep === 'approval' && <>
         <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
           <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px' }}>Send for Approval</div>

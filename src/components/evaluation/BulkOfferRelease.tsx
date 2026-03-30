@@ -6,7 +6,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 
 interface LPPSubcategory { name: string; category: string; approvedIntake: number; }
 interface FullLPP {
-  id: string; name: string; totalSeats: number;
+  id: string; name: string; totalSeats: number; fee: number;
   categoryWiseSeats: Record<string, number>;
   subcategories?: LPPSubcategory[];
 }
@@ -65,6 +65,9 @@ interface StudentOfferResult {
   cycleAllotmentType?: 'Fresh' | 'Upgraded' | 'StatusQuo' | 'Waitlisted';
   upgradedFromProgramId?: string;
   upgradedFromCycleId?: string;
+  previousProgramFee?: number;
+  newProgramFee?: number;
+  feeDelta?: number;
 }
 
 interface PrevAcceptedDetail {
@@ -137,6 +140,7 @@ function releaseOffers(
   appMap: Map<string, Application>,
   prevCycleData: PrevCycleData | null,
   prevCycleId: string | null,
+  fullLpps: FullLPP[],
 ): StudentOfferResult[] {
   const remaining = new Map<string, number>();
   for (const row of algoRows) {
@@ -180,6 +184,8 @@ function releaseOffers(
           const oldKey = `${detail.awardedProgramId}::${app.category}`;
           remaining.set(oldKey, (remaining.get(oldKey) ?? 0) + 1);
           awardedProgram.set(detail.applicationId, pref.lppId);
+          const prevFee = fullLpps.find((l) => l.id === detail.awardedProgramId)?.fee ?? 0;
+          const newFee  = fullLpps.find((l) => l.id === pref.lppId)?.fee ?? 0;
           results.push({
             applicationId: detail.applicationId,
             studentName: app.studentName,
@@ -193,6 +199,9 @@ function releaseOffers(
             cycleAllotmentType: 'Upgraded',
             upgradedFromProgramId: detail.awardedProgramId,
             upgradedFromCycleId: prevCycleId ?? undefined,
+            previousProgramFee: prevFee,
+            newProgramFee: newFee,
+            feeDelta: newFee - prevFee,
           });
           upgraded = true;
           break;
@@ -464,7 +473,7 @@ export default function BulkOfferRelease({
       }
     }
 
-    const offerResults = releaseOffers(algoRows, rankRecords, appMap, prevCycleData, prevCycleData?.prevCycleId ?? null);
+    const offerResults = releaseOffers(algoRows, rankRecords, appMap, prevCycleData, prevCycleData?.prevCycleId ?? null, fullLpps);
     setResults(offerResults);
 
     const totalOffered = offerResults.filter((r) => r.awardedProgramId !== null).length;
@@ -791,7 +800,10 @@ export default function BulkOfferRelease({
                     <th style={{ textAlign: 'left' }}>Category</th>
                     <th style={{ textAlign: 'left', minWidth: '160px' }}>Program Offered</th>
                     <th style={{ textAlign: 'center' }}>Score</th>
-                    <th style={{ textAlign: 'left', minWidth: '160px' }}>Remarks</th>
+                    {hasPreviousCycle && <>
+                      <th style={{ textAlign: 'left', minWidth: '180px' }}>Remarks</th>
+                      <th style={{ textAlign: 'left', minWidth: '160px' }}>Fee Adjustment</th>
+                    </>}
                   </tr>
                 </thead>
                 <tbody>
@@ -799,6 +811,16 @@ export default function BulkOfferRelease({
                     const programName = r.awardedProgramId ? (lppMap.get(r.awardedProgramId) ?? r.awardedProgramId) : '—';
                     const remark = getRemark(r, prevCycleData?.waitlistedIds ?? [], hasPreviousCycle ?? false);
                     const remarkColor = remark.includes('Upgraded') ? '#15803d' : remark.includes('Waitlist') ? '#b45309' : remark.includes('Fresh') ? '#1d4ed8' : 'var(--color-text-muted)';
+                    let feeAdjCell: React.ReactNode = '—';
+                    if (hasPreviousCycle && r.cycleAllotmentType === 'Upgraded' && r.feeDelta !== undefined) {
+                      if (r.feeDelta > 0) {
+                        feeAdjCell = <span style={{ color: '#c53030', fontWeight: 600 }}>Pay ₹{r.feeDelta.toLocaleString('en-IN')} more</span>;
+                      } else if (r.feeDelta < 0) {
+                        feeAdjCell = <span style={{ color: '#15803d', fontWeight: 600 }}>Refund ₹{Math.abs(r.feeDelta).toLocaleString('en-IN')}</span>;
+                      } else {
+                        feeAdjCell = <span style={{ color: 'var(--color-text-muted)' }}>No change</span>;
+                      }
+                    }
                     return (
                       <tr key={r.applicationId}>
                         <td style={{ fontWeight: 600 }}>{r.studentName}</td>
@@ -806,7 +828,10 @@ export default function BulkOfferRelease({
                         <td>{r.category}</td>
                         <td>{programName}</td>
                         <td style={{ textAlign: 'center' }}>{r.compositeScore.toFixed(1)}</td>
-                        <td style={{ color: remarkColor, fontWeight: 500 }}>{remark}</td>
+                        {hasPreviousCycle && <>
+                          <td style={{ color: remarkColor, fontWeight: 500 }}>{remark}</td>
+                          <td>{feeAdjCell}</td>
+                        </>}
                       </tr>
                     );
                   })}

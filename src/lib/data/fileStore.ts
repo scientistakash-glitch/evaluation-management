@@ -275,6 +275,7 @@ const WRITABLE_KEYS = [
   'rank-records.json',
   'offer-releases.json',
   'cycle-comments.json',
+  'fee-configs.json',
 ];
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -290,6 +291,7 @@ const store: Record<string, any[]> = {
   'rank-records.json':       [],
   'offer-releases.json':     [],
   'cycle-comments.json':     [],
+  'fee-configs.json':        [],
 };
 
 export function resetStore(): void {

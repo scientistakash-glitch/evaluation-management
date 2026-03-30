@@ -10,6 +10,7 @@ export interface LPP {
   name: string;
   code: string;
   duration: number;
+  fee: number;
   totalSeats: number;
   categoryWiseSeats: Record<string, number>;
   subcategories?: LPPSubcategory[];
