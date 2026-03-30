@@ -253,7 +253,10 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
     try {
       // Persist approval to server (updates both evaluation and cycle status)
       const res = await fetch(`/api/evaluations/${evaluation.id}/approve`, { method: 'POST' });
-      if (!res.ok) throw new Error('Approval failed');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? 'Approval failed');
+      }
 
       setApproved(true);
       setEvaluation((prev) => prev ? { ...prev, status: 'Approved' } : prev);
@@ -270,8 +273,15 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         } catch { /* ignore */ }
       }
       showToast('Sent for approval successfully', 'success');
-    } catch {
-      showToast('Failed to send for approval', 'error');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to send for approval';
+      if (msg.toLowerCase().includes('not found')) {
+        try { sessionStorage.removeItem(`cycle-${cycleId}`); } catch { /* ignore */ }
+        showToast('Session expired. Please re-run the evaluation wizard.', 'error');
+        router.push('/');
+      } else {
+        showToast(msg, 'error');
+      }
     } finally {
       setApproving(false);
     }
