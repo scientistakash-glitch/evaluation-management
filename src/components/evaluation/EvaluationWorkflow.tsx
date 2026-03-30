@@ -277,7 +277,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
       const msg = e instanceof Error ? e.message : 'Failed to send for approval';
       if (msg.toLowerCase().includes('not found')) {
         try { sessionStorage.removeItem(`cycle-${cycleId}`); } catch { /* ignore */ }
-        showToast('Session expired. Please re-run the evaluation wizard.', 'error');
+        showToast('Session data is outdated — please create a new cycle from the Cycles page.', 'error');
         router.push('/');
       } else {
         showToast(msg, 'error');
@@ -422,7 +422,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
           lppMap={lppMap}
           appMap={appMap}
           hasPreviousCycle={cycle.hasPreviousCycle}
-          onProceed={generationMode === 'fresh' ? () => setEvalStep('approval') : undefined}
+          onProceed={() => setEvalStep('approval')}
         />
         <div style={{ marginTop: '24px' }}>
           <button className="btn-secondary" onClick={() => setEvalStep('scores')}>← Back to Merit List</button>
@@ -430,7 +430,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
       </>}
 
       {/* ════════════ STEP 8: Approval ════════════ */}
-      {evalStep === 'approval' && generationMode === 'fresh' && <>
+      {evalStep === 'approval' && <>
         <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px' }}>
           <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px' }}>Send for Approval</div>
           {approved ? (

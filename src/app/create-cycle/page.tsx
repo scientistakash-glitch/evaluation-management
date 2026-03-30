@@ -46,9 +46,6 @@ export default function CreateCyclePage() {
 
   const [step, setStep] = useState(1);
 
-  // Cycle Definition sub-steps
-  const [cycleDefSubStep, setCycleDefSubStep] = useState<'group' | 'cycleDates' | 'feeDates'>('group');
-
   // Step 1a — Academic Year + Program Group
   const [academicYear, setAcademicYear] = useState(() => {
     const yr = new Date().getFullYear();
@@ -84,7 +81,7 @@ export default function CreateCyclePage() {
   // Step 2 — Strategy + Generation Mode
   const [strategy, setStrategy] = useState<'single' | 'program-wise' | null>(null);
   const [generationMode, setGenerationMode] = useState<'fresh' | 'previous'>('fresh');
-  const totalSteps = generationMode === 'previous' ? 2 : 3;
+  const totalSteps = generationMode === 'previous' ? 4 : 5;
 
   // Step 3 — Criteria & Tiebreakers (sub-stepped; only in fresh mode)
   const [subStep5, setSubStep5] = useState<'weights' | 'tiebreakers'>('weights');
@@ -127,7 +124,6 @@ export default function CreateCyclePage() {
       if (!raw) return;
       const d = JSON.parse(raw);
       if (d.step)                    setStep(d.step);
-      if (d.cycleDefSubStep)         setCycleDefSubStep(d.cycleDefSubStep);
       if (d.academicYear)            setAcademicYear(d.academicYear);
       if (d.selectedPtatId)          setSelectedPtatId(d.selectedPtatId);
       if (d.withdrawalWithRefund)    setWithdrawalWithRefund(d.withdrawalWithRefund);
@@ -162,7 +158,6 @@ export default function CreateCyclePage() {
   function feeDatesValid() {
     return !!installmentPlanId && installmentRows.every((r) => !!r.dueDate);
   }
-  function step1Valid() { return step1GroupValid() && cycleDatesValid() && feeDatesValid(); }
   function step2Valid() { return strategy !== null; }
   function step3Valid() {
     if (subStep5 === 'weights') {
@@ -172,9 +167,11 @@ export default function CreateCyclePage() {
   }
 
   function stepValid() {
-    if (step === 1) return step1Valid();
-    if (step === 2) return step2Valid();
-    if (step === 3) return step3Valid();
+    if (step === 1) return step1GroupValid();
+    if (step === 2) return cycleDatesValid();
+    if (step === 3) return feeDatesValid();
+    if (step === 4) return step2Valid();
+    if (step === 5) return step3Valid();
     return false;
   }
 
@@ -221,7 +218,7 @@ export default function CreateCyclePage() {
   function saveDraft() {
     try {
       localStorage.setItem('create-cycle-draft', JSON.stringify({
-        step, cycleDefSubStep, academicYear, selectedPtatId,
+        step, academicYear, selectedPtatId,
         withdrawalWithRefund, withdrawalWithoutRefund,
         installmentPlanId, installmentRows,
         strategy, generationMode, tiebreakerRules,
@@ -589,46 +586,18 @@ export default function CreateCyclePage() {
   }
 
   function renderStep1() {
-    return (
-      <div className="wizard-step">
-        {/* Mini sub-stepper */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0', marginBottom: '24px', padding: '12px 16px', background: 'var(--color-bg)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
-          {(['group', 'cycleDates', 'feeDates'] as const).map((sub, i) => {
-            const subOrder = ['group', 'cycleDates', 'feeDates'];
-            const isDone   = subOrder.indexOf(sub) < subOrder.indexOf(cycleDefSubStep);
-            const isActive = sub === cycleDefSubStep;
-            const label    = sub === 'group' ? 'A — Year & Group' : sub === 'cycleDates' ? 'B — Cycle Dates' : 'C — Fee Dates';
-            return (
-              <React.Fragment key={sub}>
-                {i > 0 && (
-                  <div style={{ flex: 1, height: '2px', background: isDone ? 'var(--color-primary)' : 'var(--color-border)', margin: '0 8px' }} />
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11px', fontWeight: 700, flexShrink: 0,
-                    background: isDone ? 'var(--color-primary)' : isActive ? 'var(--color-primary)' : 'var(--color-border)',
-                    color: isDone || isActive ? 'white' : 'var(--color-text-muted)',
-                  }}>
-                    {isDone ? '✓' : (i + 1)}
-                  </div>
-                  <span style={{ fontSize: '13px', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--color-primary)' : isDone ? 'var(--color-text)' : 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                    {label}
-                  </span>
-                </div>
-              </React.Fragment>
-            );
-          })}
-        </div>
-
-        {cycleDefSubStep === 'group'      && renderGroupSubStep()}
-        {cycleDefSubStep === 'cycleDates' && renderCycleDatesSubStep()}
-        {cycleDefSubStep === 'feeDates'   && renderFeeDatesSubStep()}
-      </div>
-    );
+    return <div className="wizard-step">{renderGroupSubStep()}</div>;
   }
 
   function renderStep2() {
+    return <div className="wizard-step">{renderCycleDatesSubStep()}</div>;
+  }
+
+  function renderStep3() {
+    return <div className="wizard-step">{renderFeeDatesSubStep()}</div>;
+  }
+
+  function renderStep4() {
     const hasPrev = cycleNumber !== null && cycleNumber > 1;
     return (
       <div className="wizard-step">
@@ -690,7 +659,7 @@ export default function CreateCyclePage() {
     );
   }
 
-  function renderStep3() {
+  function renderStep5() {
     return (
       <div className="wizard-step">
         <h2 className="step-title">Criteria &amp; Tiebreakers</h2>
@@ -806,8 +775,8 @@ export default function CreateCyclePage() {
   // ── Progress bar labels ───────────────────────────────────────────────────────
 
   const wizardStepLabels = generationMode === 'previous'
-    ? ['Cycle Definition', 'Strategy', 'Scores & Merit', 'Bulk Offers', 'Approval']
-    : ['Cycle Definition', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Approval'];
+    ? ['Year & Group', 'Cycle Dates', 'Fee Dates', 'Strategy']
+    : ['Year & Group', 'Cycle Dates', 'Fee Dates', 'Strategy', 'Criteria & TB'];
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -840,6 +809,8 @@ export default function CreateCyclePage() {
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
+        {step === 5 && renderStep5()}
 
         {error && (
           <div style={{ marginTop: '16px', padding: '12px 16px', background: '#fff5f5', border: '1px solid #feb2b2', borderRadius: '8px', color: '#c53030', fontSize: '14px' }}>
@@ -852,13 +823,10 @@ export default function CreateCyclePage() {
           <div style={{ display: 'flex', gap: '10px' }}>
           <button
             className="btn-secondary"
-            disabled={(step === 1 && cycleDefSubStep === 'group') || submitting || generating}
+            disabled={step === 1 || submitting || generating}
             onClick={() => {
-              if (step === 1 && cycleDefSubStep === 'cycleDates') { setCycleDefSubStep('group');      return; }
-              if (step === 1 && cycleDefSubStep === 'feeDates')   { setCycleDefSubStep('cycleDates'); return; }
-              if (step === 3 && subStep5 === 'tiebreakers')       { setSubStep5('weights');           return; }
-              if (step === 2) { setCycleDefSubStep('feeDates'); setStep((s) => s - 1); return; }
-              if (step === 3) { setSubStep5('weights'); setStep((s) => s - 1); }
+              if (step === 5 && subStep5 === 'tiebreakers') { setSubStep5('weights'); return; }
+              setStep((s) => s - 1);
             }}
           >
             ← Back
@@ -874,19 +842,7 @@ export default function CreateCyclePage() {
           </div>
 
           {/* Next / Submit */}
-          {step === 1 && cycleDefSubStep === 'group' ? (
-            <button className="btn-primary" onClick={() => setCycleDefSubStep('cycleDates')} disabled={!step1GroupValid()}>
-              Next: Cycle Dates →
-            </button>
-          ) : step === 1 && cycleDefSubStep === 'cycleDates' ? (
-            <button className="btn-primary" onClick={() => setCycleDefSubStep('feeDates')} disabled={!cycleDatesValid()}>
-              Next: Fee Dates →
-            </button>
-          ) : step === 1 && cycleDefSubStep === 'feeDates' ? (
-            <button className="btn-primary" onClick={() => setStep((s) => s + 1)} disabled={!feeDatesValid()}>
-              Next →
-            </button>
-          ) : step === 3 && subStep5 === 'weights' ? (
+          {step === 5 && subStep5 === 'weights' ? (
             <button className="btn-primary" onClick={() => setSubStep5('tiebreakers')} disabled={!programConfigs.every(({ weights: w }) => Math.abs(w.entrance + w.academic + w.interview - 100) < 0.5)}>
               Next: Tiebreakers →
             </button>
