@@ -1,4 +1,4 @@
-export type CycleStatus = 'Planned' | 'Active' | 'Closed' | 'Approved';
+export type CycleStatus = 'Planned' | 'Active' | 'Closed' | 'Approved' | 'Released';
 
 export interface CycleDateRange {
   start: string;  // ISO datetime string e.g. "2026-06-01T09:00"

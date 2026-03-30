@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCycleById, getAllCycles } from '@/lib/data/cycles';
 import { getAllRankRecords } from '@/lib/data/rankRecords';
 import { getAllLpps } from '@/lib/data/lpps';
+import { getOfferReleaseByCycleId } from '@/lib/data/offerReleases';
 
 const DEFAULT_INTAKE = 60;
 
@@ -41,8 +42,15 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ programs });
     }
 
-    // Get rank records from the previous cycle
-    const rankRecords = await getAllRankRecords({ cycleId: previousCycle.id });
+    // Get rank records and offer release from the previous cycle
+    const [rankRecords, offerRelease] = await Promise.all([
+      getAllRankRecords({ cycleId: previousCycle.id }),
+      getOfferReleaseByCycleId(previousCycle.id),
+    ]);
+
+    // Use real offer-release summary when available
+    const totalOffered = offerRelease?.summary.released ?? 0;
+    const totalWaitlisted = offerRelease?.summary.pending ?? 0;
 
     const programs = cycleLpps.map((lpp) => {
       // For program-wise: filter by lppId; for single: use all records
@@ -50,8 +58,11 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
         (r) => r.programId === lpp.id || r.programId === 'all'
       );
       const intake = DEFAULT_INTAKE;
-      const previousOffers = lppRecords.length;
-      const previousAcceptances = lppRecords.filter((r) => r.globalRank <= intake).length;
+      // Fall back to rank record count only if offer release isn't persisted yet
+      const previousOffers = totalOffered > 0 ? totalOffered : lppRecords.length;
+      const previousAcceptances = offerRelease
+        ? Math.round(previousOffers * 0.85)  // estimate: 85% acceptance rate
+        : lppRecords.filter((r) => r.globalRank <= intake).length;
 
       return {
         lppId: lpp.id,
@@ -59,10 +70,11 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
         intake,
         previousOffers,
         previousAcceptances,
+        previousWaitlisted: totalWaitlisted,
       };
     });
 
-    return NextResponse.json({ programs });
+    return NextResponse.json({ programs, totalOffered, totalWaitlisted });
   } catch {
     return NextResponse.json({ error: 'Failed to fetch previous stats' }, { status: 500 });
   }

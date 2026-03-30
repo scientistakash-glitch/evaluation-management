@@ -1,4 +1,4 @@
-export type ApplicationCategory = 'General' | 'OBC' | 'SC' | 'ST' | 'EWS';
+export type ApplicationCategory = 'General' | 'OBC' | 'SC/ST' | 'NRI-American' | 'NRI-Arab';
 
 export interface Application {
   id: string;

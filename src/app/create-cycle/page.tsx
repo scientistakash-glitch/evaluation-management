@@ -280,6 +280,22 @@ export default function CreateCyclePage() {
       const appsRes = await fetch('/api/applications');
       const allApps = appsRes.ok ? await appsRes.json() : [];
 
+      // In "previous" mode, filter out students already offered in the previous cycle
+      let filteredApps = allApps;
+      if (generationMode === 'previous') {
+        try {
+          const prevRes = await fetch(`/api/cycles/${cycle.id}/previous-offer-results`);
+          if (prevRes.ok) {
+            const prevData = await prevRes.json();
+            if (prevData.offeredIds && prevData.offeredIds.length > 0) {
+              const offeredSet = new Set<string>(prevData.offeredIds as string[]);
+              filteredApps = allApps.filter((app: { id: string }) => !offeredSet.has(app.id));
+              showToast(`Waitlist carryover: ${filteredApps.length} students from previous cycle waitlist`, 'info');
+            }
+          }
+        } catch { /* ignore, use full pool */ }
+      }
+
       let configsToRun = evaluation.programConfigs.map((pc: ProgramConfig) =>
         generationMode === 'previous' ? { ...pc, weights: { entrance: 60, academic: 30, interview: 10 } } : pc
       );
@@ -295,8 +311,8 @@ export default function CreateCyclePage() {
       const allRankRecords: unknown[] = [];
       for (const pc of configsToRun) {
         const programApps = pc.programId === 'all'
-          ? allApps
-          : allApps.filter((app: { lppPreferences?: { lppId: string }[]; lppPreference: string }) =>
+          ? filteredApps
+          : filteredApps.filter((app: { lppPreferences?: { lppId: string }[]; lppPreference: string }) =>
               app.lppPreferences?.some((p: { lppId: string }) => p.lppId === pc.programId) ?? app.lppPreference === pc.programId
             );
 
@@ -322,8 +338,15 @@ export default function CreateCyclePage() {
         allRankRecords.push(...(Array.isArray(rankings) ? rankings : []));
       }
 
-      // Persist ranks to sessionStorage so evaluation page loads them directly
+      // Persist evaluation 'Ranked' status to server
       const updatedEval = { ...evaluation, ranksGenerated: true, status: 'Ranked' };
+      await fetch(`/api/evaluations/${evaluation.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ranksGenerated: true, status: 'Ranked' }),
+      }).catch(() => { /* ignore */ });
+
+      // Cache in sessionStorage for fast navigation
       sessionStorage.setItem(`cycle-${cycle.id}`, JSON.stringify({
         cycle, evaluation: updatedEval, ptat: selectedPtatObj, lpps: ptatLpps, generationMode, rankRecords: allRankRecords,
       }));

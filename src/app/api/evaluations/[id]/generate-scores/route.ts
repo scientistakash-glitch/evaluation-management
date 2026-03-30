@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { computeScores } from '@/lib/engine/scoreEngine';
+import { createBatch, deleteByEvaluationAndProgram } from '@/lib/data/evaluationScores';
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -14,7 +15,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const scores = computeScores(params.id, programId, weights, applications);
-    return NextResponse.json(scores);
+
+    // Persist: remove old scores for this evaluation+program, then save new ones
+    await deleteByEvaluationAndProgram(params.id, programId);
+    const persisted = await createBatch(scores);
+
+    return NextResponse.json(persisted);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to generate scores';
     return NextResponse.json({ error: message }, { status: 500 });

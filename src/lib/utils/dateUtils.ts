@@ -25,7 +25,7 @@ export function validateNonOverlapping(
     if (!c.timeline) continue;
     const cStart = cycleTimelineStart(c.timeline);
     const cEnd   = cycleTimelineEnd(c.timeline);
-    if (c.ptatId === newCycle.ptatId && cyclesOverlap(newCycle, { start: cStart, end: cEnd })) {
+    if (c.ptatId === newCycle.ptatId && cStart && cEnd && cyclesOverlap(newCycle, { start: cStart, end: cEnd })) {
       return `Date range overlaps with Cycle ${c.number ?? ''} (${cStart} – ${cEnd})`;
     }
   }

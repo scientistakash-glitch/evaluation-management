@@ -10,7 +10,7 @@ interface Cycle {
   academicYear: string;
   ptatId: string;
   lppIds: string[];
-  status: 'Planned' | 'Active' | 'Closed' | 'Approved';
+  status: 'Planned' | 'Active' | 'Closed' | 'Approved' | 'Released';
   evaluationStrategy: 'single' | 'program-wise' | null;
 }
 
@@ -19,14 +19,13 @@ interface LPP  { id: string; ptatId: string; name: string; totalSeats: number; }
 
 type DisplayStatus = 'Draft' | 'Approval Pending' | 'Review Needed' | 'Approved' | 'Released';
 
-function getDisplayStatus(cycle: Cycle, hasOffers: boolean, statusOverride?: string): DisplayStatus {
-  if (hasOffers) return 'Released';
-  if (statusOverride === 'approval-pending') return 'Approval Pending';
+function getDisplayStatus(cycle: Cycle, hasOffers: boolean): DisplayStatus {
   switch (cycle.status) {
-    case 'Planned':  return 'Draft';
+    case 'Released': return 'Released';
     case 'Active':   return 'Approval Pending';
     case 'Closed':   return 'Review Needed';
     case 'Approved': return 'Approved';
+    case 'Planned':  return hasOffers ? 'Released' : 'Draft';
     default:         return 'Draft';
   }
 }
@@ -46,26 +45,34 @@ export default function CyclesPage() {
   const [lpps, setLpps]       = useState<LPP[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [offerOverrides, setOfferOverrides] = useState<Record<string, { released: number; accepted: number; pending: number; withdrawn: number }>>({});
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
   const [hasDraft, setHasDraft] = useState(false);
 
   useEffect(() => {
     async function load() {
       setIsLoading(true);
       try {
-        // Reset server data once per browser session so each new tab starts fresh
-        if (!sessionStorage.getItem('app-session-initialized')) {
-          await fetch('/api/reset', { method: 'POST' });
-          sessionStorage.setItem('app-session-initialized', 'true');
-        }
         const [cyclesRes, ptatsRes, lppsRes] = await Promise.all([
           fetch('/api/cycles').then((r) => r.json()),
           fetch('/api/ptats').then((r) => r.json()),
           fetch('/api/lpps').then((r) => r.json()),
         ]);
-        setCycles(Array.isArray(cyclesRes) ? cyclesRes : []);
+        const cyclesList: Cycle[] = Array.isArray(cyclesRes) ? cyclesRes : [];
+        setCycles(cyclesList);
         setPtats(Array.isArray(ptatsRes) ? ptatsRes : []);
         setLpps(Array.isArray(lppsRes) ? lppsRes : []);
+
+        // Load offer data from server for each cycle
+        if (cyclesList.length > 0) {
+          const offerPromises = cyclesList.map((c) =>
+            fetch(`/api/cycles/${c.id}/offer-release`).then((r) => r.ok ? r.json() : null).catch(() => null)
+          );
+          const offerResults = await Promise.all(offerPromises);
+          const overrides: Record<string, { released: number; accepted: number; pending: number; withdrawn: number }> = {};
+          offerResults.forEach((data, i) => {
+            if (data?.summary) overrides[cyclesList[i].id] = data.summary;
+          });
+          setOfferOverrides(overrides);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -73,22 +80,6 @@ export default function CyclesPage() {
     load();
     setHasDraft(!!localStorage.getItem('create-cycle-draft'));
   }, []);
-
-  useEffect(() => {
-    if (cycles.length === 0) return;
-    const overrides: Record<string, { released: number; accepted: number; pending: number; withdrawn: number }> = {};
-    const statuses: Record<string, string> = {};
-    for (const cycle of cycles) {
-      try {
-        const stored = sessionStorage.getItem(`cycle-${cycle.id}-offers`);
-        if (stored) overrides[cycle.id] = JSON.parse(stored);
-        const s = sessionStorage.getItem(`cycle-${cycle.id}-status`);
-        if (s) statuses[cycle.id] = s;
-      } catch { /* ignore */ }
-    }
-    setOfferOverrides(overrides);
-    setStatusOverrides(statuses);
-  }, [cycles]);
 
   const ptatMap = new Map(ptats.map((p) => [p.id, p]));
   const lppMap  = new Map(lpps.map((l) => [l.id, l]));
@@ -102,9 +93,23 @@ export default function CyclesPage() {
     <div className="page-container">
       <div className="page-header">
         <h1 className="page-title">Admissions Cycles</h1>
-        <button className="btn-primary" onClick={() => router.push('/create-cycle')}>
-          + Create New Cycle
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            className="btn-secondary"
+            style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--color-text-muted)' }}
+            onClick={async () => {
+              if (!confirm('Reset all data and start fresh?')) return;
+              await fetch('/api/reset', { method: 'POST' });
+              localStorage.removeItem('create-cycle-draft');
+              window.location.reload();
+            }}
+          >
+            Reset Demo
+          </button>
+          <button className="btn-primary" onClick={() => router.push('/create-cycle')}>
+            + Create New Cycle
+          </button>
+        </div>
       </div>
 
       {/* Draft in progress banner */}
@@ -151,14 +156,14 @@ export default function CyclesPage() {
                   <th style={{ color: 'var(--color-text-muted)' }}>Offers Released</th>
                   <th style={{ color: '#276749' }}>Committed</th>
                   <th style={{ color: '#92400e' }}>Withdrawn</th>
-                  <th style={{ color: '#1d4ed8' }}>Pending</th>
+                  <th style={{ color: '#1d4ed8' }}>Pending Acceptance</th>
                 </tr>
               </thead>
               <tbody>
                 {cycles.map((cycle) => {
                   const ptat = ptatMap.get(cycle.ptatId);
                   const offers = offerOverrides[cycle.id];
-                  const displayStatus = getDisplayStatus(cycle, !!offers, statusOverrides[cycle.id]);
+                  const displayStatus = getDisplayStatus(cycle, !!offers);
                   return (
                     <tr
                       key={cycle.id}

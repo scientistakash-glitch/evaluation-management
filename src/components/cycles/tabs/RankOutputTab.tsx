@@ -8,7 +8,7 @@ interface RankOutputTabProps {
   cycle: Cycle;
 }
 
-const CATEGORIES = ['All', 'General', 'OBC', 'SC', 'ST', 'EWS'];
+const CATEGORIES = ['All', 'General', 'OBC', 'SC/ST', 'NRI-American', 'NRI-Arab'];
 
 export default function RankOutputTab({ cycle }: RankOutputTabProps) {
   const { showToast } = useToast();

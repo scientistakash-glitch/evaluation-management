@@ -13,7 +13,7 @@ interface Cycle {
   ptatId: string; lppIds: string[];
   timeline: { startDate: string; offerReleaseDate: string; acceptanceDeadline: string; paymentDeadline: string; closingDate: string; };
   evaluationStrategy: 'single' | 'program-wise' | null;
-  status: 'Planned' | 'Active' | 'Closed' | 'Approved';
+  status: 'Planned' | 'Active' | 'Closed' | 'Approved' | 'Released';
 }
 
 interface PTAT { id: string; name: string; }
@@ -182,6 +182,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
           setFullLpps(parsed.lpps ?? []);
           setGenerationMode(parsed.generationMode ?? 'fresh');
           setApproved(parsed.evaluation?.status === 'Approved');
+          if (parsed.evaluation?.status === 'Approved') setEvalStep('approval');
           if (Array.isArray(parsed.rankRecords)) setRankRecords(parsed.rankRecords);
         }
       } catch { /* ignore */ }
@@ -214,6 +215,7 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
             if (ev) {
               setEvaluation(ev);
               setApproved(ev.status === 'Approved');
+              if (ev.status === 'Approved') setEvalStep('approval');
               const rankRes = await fetch(`/api/rank-records?evaluationId=${ev.id}`);
               if (rankRes.ok) {
                 const records = await rankRes.json();
@@ -246,22 +248,30 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   // ── Approve ───────────────────────────────────────────────────────────────
 
   async function handleApprove() {
+    if (!evaluation) return;
     setApproving(true);
     try {
+      // Persist approval to server (updates both evaluation and cycle status)
+      const res = await fetch(`/api/evaluations/${evaluation.id}/approve`, { method: 'POST' });
+      if (!res.ok) throw new Error('Approval failed');
+
       setApproved(true);
       setEvaluation((prev) => prev ? { ...prev, status: 'Approved' } : prev);
       if (cycle) {
-        sessionStorage.setItem(`cycle-${cycle.id}-status`, 'approval-pending');
+        // Update sessionStorage cache to match server state
         try {
           const raw = sessionStorage.getItem(`cycle-${cycle.id}`);
           if (raw) {
             const data = JSON.parse(raw);
-            data.cycle = { ...data.cycle, status: 'Active' };
+            data.cycle = { ...data.cycle, status: 'Approved' };
+            data.evaluation = { ...data.evaluation, status: 'Approved' };
             sessionStorage.setItem(`cycle-${cycle.id}`, JSON.stringify(data));
           }
         } catch { /* ignore */ }
       }
       showToast('Sent for approval successfully', 'success');
+    } catch {
+      showToast('Failed to send for approval', 'error');
     } finally {
       setApproving(false);
     }
@@ -333,9 +343,12 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
   const tiedCount = new Set(rankRecords.filter((r) => r.tieBreakerApplied).map((r) => r.applicationId)).size;
 
   // Compute active stepper step: scores=scoreStep, offers=scoreStep+1, approval=scoreStep+2
-  const activeStepNum = evalStep === 'scores' ? scoreStep
+  const totalSteps = generationMode === 'previous' ? 7 : 8;
+  const activeStepNum = approved
+    ? totalSteps + 1   // all steps show as "done"
+    : evalStep === 'scores' ? scoreStep
     : evalStep === 'offers' ? scoreStep + 1
-    : approved ? scoreStep + 3 : scoreStep + 2;
+    : scoreStep + 2;
 
   return (
     <div className="page-container">
@@ -416,8 +429,8 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
                 <span style={{ fontSize: '18px' }}>✓</span>
                 <strong>Submitted for approval</strong>
               </div>
-              <button className="btn-primary" style={{ width: 'fit-content' }} onClick={() => router.push('/')}>
-                Go to Homepage →
+              <button className="btn-primary" style={{ width: 'fit-content' }} onClick={() => router.push(`/cycle/${cycleId}/view`)}>
+                Back to Cycle Overview →
               </button>
             </div>
           ) : (

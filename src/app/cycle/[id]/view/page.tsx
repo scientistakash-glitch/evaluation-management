@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -8,7 +8,7 @@ import { useRouter, useParams } from 'next/navigation';
 interface Cycle {
   id: string; name: string; number: number; academicYear: string;
   ptatId: string; lppIds: string[];
-  status: 'Planned' | 'Active' | 'Closed' | 'Approved';
+  status: 'Planned' | 'Active' | 'Closed' | 'Approved' | 'Released';
 }
 
 interface PTAT { id: string; name: string; }
@@ -20,6 +20,19 @@ interface OfferConfigRow {
   applicants: number; eligiblePool: number; offersToRelease: number;
 }
 
+interface StudentOfferResult {
+  applicationId: string;
+  studentName: string;
+  rollNumber: string;
+  category: string;
+  compositeScore: number;
+  awardedProgramId: string | null;
+  awardedPreferenceOrder: number | null;
+  acceptanceStatus?: 'Pending' | 'Accepted' | 'Withdrawn';
+  cycleAllotmentType?: 'Fresh' | 'Upgraded' | 'StatusQuo' | 'Waitlisted';
+  upgradedFromProgramId?: string;
+}
+
 interface ReviewComment {
   author: string;
   timestamp: string;
@@ -29,12 +42,12 @@ interface ReviewComment {
 type DisplayStatus = 'Draft' | 'Approval Pending' | 'Review Needed' | 'Approved' | 'Released';
 
 function getDisplayStatus(status: string, hasOffers: boolean): DisplayStatus {
-  if (hasOffers) return 'Released';
   switch (status) {
-    case 'Planned':  return 'Draft';
+    case 'Released': return 'Released';
     case 'Active':   return 'Approval Pending';
     case 'Closed':   return 'Review Needed';
     case 'Approved': return 'Approved';
+    case 'Planned':  return hasOffers ? 'Released' : 'Draft';
     default:         return 'Draft';
   }
 }
@@ -73,11 +86,33 @@ export default function CycleViewPage() {
   const [hasOffers, setHasOffers]   = useState(false);
   const [newComment, setNewComment] = useState('');
   const [showCommentBox, setShowCommentBox] = useState(false);
-  const [loaded, setLoaded]         = useState(false);
+  const [showDefs, setShowDefs]           = useState(false);
+  const [loaded, setLoaded]               = useState(false);
+  const [releasing, setReleasing]         = useState(false);
+  const [studentResults, setStudentResults] = useState<StudentOfferResult[]>([]);
+  const [offerSummary, setOfferSummary]   = useState<{ released: number; accepted: number; pending: number; withdrawn: number } | null>(null);
+
+  // True when any config row has committed > 0 (i.e. previous cycle data exists)
+  const hasPrevCycle = useMemo(() => (configRows ?? []).some((r) => r.committed > 0), [configRows]);
+
+  // Per-row acceptance tally derived from real studentResults data
+  const acceptanceMap = useMemo(() => {
+    const map = new Map<string, { committed: number; pending: number; withdrawn: number }>();
+    for (const r of studentResults) {
+      if (r.awardedProgramId === null) continue;
+      const key = `${r.awardedProgramId}::${r.category}`;
+      if (!map.has(key)) map.set(key, { committed: 0, pending: 0, withdrawn: 0 });
+      const entry = map.get(key)!;
+      if (r.acceptanceStatus === 'Accepted') entry.committed++;
+      else if (r.acceptanceStatus === 'Withdrawn') entry.withdrawn++;
+      else entry.pending++;
+    }
+    return map;
+  }, [studentResults]);
 
   useEffect(() => {
     async function load() {
-      // 1. Try sessionStorage first
+      // 1. Try sessionStorage cache first for cycle/ptat
       let foundInSession = false;
       try {
         const stored = sessionStorage.getItem(`cycle-${id}`);
@@ -87,12 +122,6 @@ export default function CycleViewPage() {
           setCycle(parsed.cycle ?? null);
           setPtat(parsed.ptat ?? null);
         }
-        const rowsRaw = sessionStorage.getItem(`cycle-${id}-configRows`);
-        if (rowsRaw) setConfigRows(JSON.parse(rowsRaw));
-        const offersRaw = sessionStorage.getItem(`cycle-${id}-offers`);
-        setHasOffers(!!offersRaw);
-        const commentsRaw = sessionStorage.getItem(`cycle-${id}-comments`);
-        if (commentsRaw) setComments(JSON.parse(commentsRaw));
       } catch { /* ignore */ }
 
       // 2. If sessionStorage had no cycle, fall back to API
@@ -111,6 +140,39 @@ export default function CycleViewPage() {
         } catch { /* ignore */ }
       }
 
+      // 3. Load offer release data from API (server is source of truth)
+      try {
+        const offerRes = await fetch(`/api/cycles/${id}/offer-release`);
+        if (offerRes.ok) {
+          const offerData = await offerRes.json();
+          if (offerData) {
+            setConfigRows(offerData.configRows);
+            setHasOffers(true);
+            if (Array.isArray(offerData.studentResults)) {
+              setStudentResults(offerData.studentResults);
+            }
+            if (offerData.summary) {
+              setOfferSummary(offerData.summary);
+            }
+          }
+        }
+      } catch { /* ignore */ }
+
+      // 4. Load comments from API (server is source of truth)
+      try {
+        const commentsRes = await fetch(`/api/cycles/${id}/comments`);
+        if (commentsRes.ok) {
+          const serverComments = await commentsRes.json();
+          if (Array.isArray(serverComments) && serverComments.length > 0) {
+            setComments(serverComments.map((c: { author: string; createdAt: string; text: string }) => ({
+              author: c.author,
+              timestamp: c.createdAt,
+              text: c.text,
+            })));
+          }
+        }
+      } catch { /* ignore */ }
+
       setLoaded(true);
     }
     load();
@@ -123,22 +185,53 @@ export default function CycleViewPage() {
     if (displayStatus === 'Review Needed' && comments.length === 0) {
       const seeded = [SEEDED_COMMENT];
       setComments(seeded);
-      try { sessionStorage.setItem(`cycle-${id}-comments`, JSON.stringify(seeded)); } catch { /* ignore */ }
+      fetch(`/api/cycles/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author: SEEDED_COMMENT.author, text: SEEDED_COMMENT.text }),
+      }).catch(() => { /* ignore */ });
     }
   }, [loaded, cycle, hasOffers, comments.length, id]);
 
-  function addComment() {
+  async function addComment() {
     if (!newComment.trim()) return;
     const comment: ReviewComment = {
       author: 'You',
       timestamp: new Date().toISOString(),
       text: newComment.trim(),
     };
-    const updated = [...comments, comment];
-    setComments(updated);
-    try { sessionStorage.setItem(`cycle-${id}-comments`, JSON.stringify(updated)); } catch { /* ignore */ }
+    try {
+      await fetch(`/api/cycles/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author: comment.author, text: comment.text }),
+      });
+    } catch { /* ignore */ }
+    setComments([...comments, comment]);
     setNewComment('');
     setShowCommentBox(false);
+  }
+
+  async function handleRelease() {
+    setReleasing(true);
+    try {
+      const res = await fetch(`/api/cycles/${id}/release`, { method: 'POST' });
+      if (!res.ok) throw new Error('Release failed');
+      const updated = await res.json();
+      setCycle(updated);
+      try {
+        const raw = sessionStorage.getItem(`cycle-${id}`);
+        if (raw) {
+          const data = JSON.parse(raw);
+          data.cycle = { ...data.cycle, status: 'Released' };
+          sessionStorage.setItem(`cycle-${id}`, JSON.stringify(data));
+        }
+      } catch { /* ignore */ }
+    } catch {
+      alert('Failed to release cycle. Please try again.');
+    } finally {
+      setReleasing(false);
+    }
   }
 
   if (!loaded) {
@@ -186,6 +279,24 @@ export default function CycleViewPage() {
         </span>
       </div>
 
+      {/* Approved / Released banner */}
+      {(displayStatus === 'Approved' || displayStatus === 'Released') && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '14px 20px', marginBottom: '24px',
+          background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '12px',
+          fontSize: '14px', color: '#166534',
+        }}>
+          <span style={{ fontSize: '20px' }}>✓</span>
+          <div>
+            {displayStatus === 'Approved'
+              ? <><strong>Ready to Release</strong> — Evaluation has been approved. Click &ldquo;Release Offers to Students&rdquo; below to publish.</>
+              : <><strong>Offers Released</strong> — All offer allocations have been published to students.</>
+            }
+          </div>
+        </div>
+      )}
+
       {/* Review Comments section (only when Review Needed) */}
       {isReviewNeeded && (
         <div style={{ background: 'white', border: '1px solid #fcd34d', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
@@ -207,8 +318,6 @@ export default function CycleViewPage() {
               ))}
             </div>
           )}
-
-          {/* Add comment */}
           <div style={{ marginTop: '14px' }}>
             {showCommentBox ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -240,41 +349,51 @@ export default function CycleViewPage() {
 
       {/* Offer Configuration table */}
       <div style={{ background: 'white', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '16px' }}>
-          Offer Configuration (read-only)
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showDefs ? '12px' : '16px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Offer Configuration (read-only)
+          </div>
+          <button
+            onClick={() => setShowDefs((v) => !v)}
+            style={{ fontSize: '12px', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+          >
+            {showDefs ? 'Hide definitions ▲' : 'Show definitions ▼'}
+          </button>
         </div>
 
-        {/* Definitions */}
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#374151' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px' }}>
-            <b>Approved Intake</b>          <span>Total sanctioned seats for this subcategory</span>
-            <b>Committed</b>                <span>Students who have paid the commitment fee</span>
-            <b>Available Seats</b>          <span>Approved Intake minus Committed seats</span>
-            <b>Applicants</b>               <span>Total applications for this program</span>
-            <b>Eligible Pool</b>            <span>Applicants meeting minimum eligibility criteria and previous cycle waitlisted</span>
-            <b>Pending Acceptance</b>       <span>Offers awaiting confirmation</span>
-            <b>Withdrawn</b>                <span>Applicants who have exited the process</span>
-            <b>Waitlisted for Next Cycle</b> <span>Eligible Pool minus Offers to Release</span>
+        {/* Definitions — collapsible */}
+        {showDefs && (
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#374151' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 16px' }}>
+              <b>Approved Intake</b>           <span>Total sanctioned seats for this subcategory</span>
+              <b>Available Seats</b>           <span>Approved Intake minus Committed seats</span>
+              <b>Eligible Pool</b>             <span>Applicants meeting minimum eligibility criteria and previous cycle waitlisted</span>
+              <b>Offers to Release</b>         <span>Number of offers sent out for this subcategory</span>
+              <b>Waitlisted for Next Cycle</b>  <span>Eligible Pool minus Offers to Release</span>
+              <b>Pending</b>                    <span>Offers awaiting student confirmation</span>
+              <b>Accepted</b>                  <span>Students who accepted this cycle's offer</span>
+              <b>Withdrawn</b>                 <span>Students who declined or exited the process</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {configRows && configRows.length > 0 ? (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table" style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', minWidth: '130px' }}>Program Plan</th>
+                  <th style={{ textAlign: 'left', minWidth: '140px' }}>Program Plan</th>
                   <th style={{ textAlign: 'left', minWidth: '120px' }}>Category</th>
-                  <th style={{ textAlign: 'left', minWidth: '140px' }}>Subcategory</th>
-                  <th style={{ textAlign: 'center' }}>Approved Intake</th>
-                  <th style={{ textAlign: 'center' }}>Committed</th>
-                  <th style={{ textAlign: 'center' }}>Available Seats</th>
-                  <th style={{ textAlign: 'center' }}>Applicants</th>
-                  <th style={{ textAlign: 'center' }}>Eligible Pool</th>
-                  <th style={{ textAlign: 'center' }}>Pending Acceptance</th>
-                  <th style={{ textAlign: 'center' }}>Withdrawn</th>
-                  <th style={{ textAlign: 'center' }}>Offers to Release</th>
-                  <th style={{ textAlign: 'center', minWidth: '130px' }}>Waitlisted for Next Cycle</th>
+                  <th style={{ textAlign: 'left', minWidth: '100px' }}>Subcategory</th>
+                  <th style={{ textAlign: 'right', minWidth: '110px' }}>Approved Intake</th>
+                  {hasPrevCycle && <th style={{ textAlign: 'right', minWidth: '100px' }}>Committed</th>}
+                  {hasPrevCycle && <th style={{ textAlign: 'right', minWidth: '110px' }}>Available Seats</th>}
+                  <th style={{ textAlign: 'right', minWidth: '100px' }}>Eligible Pool</th>
+                  <th style={{ textAlign: 'right', minWidth: '110px' }}>Offers Released</th>
+                  <th style={{ textAlign: 'right', minWidth: '150px' }}>Waitlisted for Next Cycle</th>
+                  <th style={{ textAlign: 'right', minWidth: '80px' }}>Pending</th>
+                  <th style={{ textAlign: 'right', minWidth: '80px' }}>Accepted</th>
+                  <th style={{ textAlign: 'right', minWidth: '80px' }}>Withdrawn</th>
                 </tr>
               </thead>
               <tbody>
@@ -282,30 +401,43 @@ export default function CycleViewPage() {
                   const prevRow = configRows[i - 1];
                   const isNewProgram  = !prevRow || prevRow.programId !== row.programId;
                   const isNewCategory = !prevRow || prevRow.programId !== row.programId || prevRow.categoryName !== row.categoryName;
-                  const pending    = Math.round(row.offersToRelease * 0.3);
-                  const withdrawn  = Math.round(row.offersToRelease * 0.05);
                   const waitlisted = Math.max(0, row.eligiblePool - row.offersToRelease);
+                  const accKey = `${row.programId}::${row.subcategoryName}`;
+                  const acc = acceptanceMap.get(accKey);
+                  const accepted  = acc?.committed ?? 0;
+                  const withdrawn = acc?.withdrawn ?? 0;
+                  const pending   = acc ? acc.pending : row.offersToRelease;
                   return (
                     <tr key={`${row.programId}-${row.subcategoryName}`}
                       style={{ borderTop: isNewProgram && i > 0 ? '2px solid var(--color-border)' : undefined }}>
-                      <td style={{ fontWeight: isNewProgram ? 700 : 400, color: isNewProgram ? 'var(--color-primary)' : 'transparent', fontSize: '13px' }}>
+                      <td style={{
+                        fontWeight: isNewProgram ? 700 : 400,
+                        color: isNewProgram ? 'var(--color-primary)' : 'transparent',
+                        fontSize: '13px',
+                        borderLeft: isNewProgram ? '3px solid var(--color-primary)' : '3px solid transparent',
+                        paddingLeft: '10px',
+                      }}>
                         {isNewProgram ? row.programName : ''}
                       </td>
-                      <td style={{ color: isNewCategory ? 'var(--color-text)' : 'transparent', fontWeight: 500 }}>
+                      <td style={{
+                        color: isNewCategory ? 'var(--color-text)' : 'transparent',
+                        fontWeight: 500,
+                        background: isNewCategory ? '#f9fafb' : undefined,
+                      }}>
                         {isNewCategory ? row.categoryName : ''}
                       </td>
                       <td>{row.subcategoryName}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.approvedIntake}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{row.committed}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.availableSeats}</td>
-                      <td style={{ textAlign: 'center' }}>{row.applicants}</td>
-                      <td style={{ textAlign: 'center' }}>{row.eligiblePool}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{pending}</td>
-                      <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>{withdrawn}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.offersToRelease}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 600, color: waitlisted > 0 ? '#b45309' : 'var(--color-text-muted)' }}>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.approvedIntake}</td>
+                      {hasPrevCycle && <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.committed}</td>}
+                      {hasPrevCycle && <td style={{ textAlign: 'right', fontWeight: 600 }}>{row.availableSeats}</td>}
+                      <td style={{ textAlign: 'right' }}>{row.eligiblePool}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--color-primary-light)' }}>{row.offersToRelease}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: waitlisted > 0 ? '#b45309' : 'var(--color-text-muted)' }}>
                         {waitlisted}
                       </td>
+                      <td style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>{pending}</td>
+                      <td style={{ textAlign: 'right', color: accepted > 0 ? '#276749' : 'var(--color-text-muted)', fontWeight: accepted > 0 ? 600 : 400 }}>{accepted}</td>
+                      <td style={{ textAlign: 'right', color: withdrawn > 0 ? '#b45309' : 'var(--color-text-muted)' }}>{withdrawn}</td>
                     </tr>
                   );
                 })}
@@ -320,11 +452,23 @@ export default function CycleViewPage() {
       </div>
 
       {/* Footer action */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="btn-primary" onClick={() => router.push(`/cycle/${id}/evaluation`)}>
-          {configRows && configRows.length > 0 ? 'Open Evaluation →' : 'Release Offers →'}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: displayStatus === 'Released' ? '24px' : 0 }}>
+        {displayStatus === 'Released' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#276749', fontSize: '14px' }}>
+            <span style={{ fontSize: '18px' }}>✓</span>
+            <span>Offers released to students.</span>
+          </div>
+        ) : displayStatus === 'Approved' ? (
+          <button className="btn-primary" onClick={handleRelease} disabled={releasing}>
+            {releasing ? 'Releasing…' : 'Release Offers to Students →'}
+          </button>
+        ) : (
+          <button className="btn-primary" onClick={() => router.push(`/cycle/${id}/evaluation`)}>
+            {configRows && configRows.length > 0 ? 'Open Evaluation →' : 'Release Offers →'}
+          </button>
+        )}
       </div>
+
     </div>
   );
 }
