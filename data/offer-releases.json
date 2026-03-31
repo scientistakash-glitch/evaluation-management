@@ -1,1 +1,1363 @@
-[]
+[
+  {
+    "cycleId": "btech-c1",
+    "studentResults": [
+      {
+        "applicationId": "app_b_100",
+        "studentName": "Aarav Sharma",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_101",
+        "studentName": "Aditi Sharma",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_102",
+        "studentName": "Arjun Sharma",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_103",
+        "studentName": "Bhavna Sharma",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_104",
+        "studentName": "Chetan Sharma",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_105",
+        "studentName": "Deepak Sharma",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_106",
+        "studentName": "Ekta Sharma",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_107",
+        "studentName": "Gaurav Sharma",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_108",
+        "studentName": "Ishaan Sharma",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_109",
+        "studentName": "Meera Sharma",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_110",
+        "studentName": "Aarav Patel",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_111",
+        "studentName": "Aditi Patel",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_112",
+        "studentName": "Arjun Patel",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_113",
+        "studentName": "Bhavna Patel",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_114",
+        "studentName": "Chetan Patel",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_115",
+        "studentName": "Deepak Patel",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_116",
+        "studentName": "Ekta Patel",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_117",
+        "studentName": "Gaurav Patel",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_118",
+        "studentName": "Ishaan Patel",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_119",
+        "studentName": "Meera Patel",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_120",
+        "studentName": "Aarav Singh",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_121",
+        "studentName": "Aditi Singh",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_122",
+        "studentName": "Arjun Singh",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_123",
+        "studentName": "Bhavna Singh",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_124",
+        "studentName": "Chetan Singh",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_125",
+        "studentName": "Deepak Singh",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_126",
+        "studentName": "Ekta Singh",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_127",
+        "studentName": "Gaurav Singh",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_128",
+        "studentName": "Ishaan Singh",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_129",
+        "studentName": "Meera Singh",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_130",
+        "studentName": "Aarav Gupta",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_131",
+        "studentName": "Aditi Gupta",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_132",
+        "studentName": "Arjun Gupta",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_133",
+        "studentName": "Bhavna Gupta",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_134",
+        "studentName": "Chetan Gupta",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_135",
+        "studentName": "Deepak Gupta",
+        "category": "General",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_136",
+        "studentName": "Ekta Gupta",
+        "category": "OBC",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_137",
+        "studentName": "Gaurav Gupta",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_138",
+        "studentName": "Ishaan Gupta",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_139",
+        "studentName": "Meera Gupta",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 1,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_140",
+        "studentName": "Aarav Verma",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_141",
+        "studentName": "Aditi Verma",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_142",
+        "studentName": "Arjun Verma",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_143",
+        "studentName": "Bhavna Verma",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_144",
+        "studentName": "Chetan Verma",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_145",
+        "studentName": "Deepak Verma",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_146",
+        "studentName": "Ekta Verma",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_147",
+        "studentName": "Gaurav Verma",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_148",
+        "studentName": "Ishaan Verma",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_149",
+        "studentName": "Meera Verma",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_150",
+        "studentName": "Aarav Kumar",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_151",
+        "studentName": "Aditi Kumar",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_152",
+        "studentName": "Arjun Kumar",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_153",
+        "studentName": "Bhavna Kumar",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_154",
+        "studentName": "Chetan Kumar",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_155",
+        "studentName": "Deepak Kumar",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_156",
+        "studentName": "Ekta Kumar",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_157",
+        "studentName": "Gaurav Kumar",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_158",
+        "studentName": "Ishaan Kumar",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_159",
+        "studentName": "Meera Kumar",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_160",
+        "studentName": "Aarav Yadav",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_161",
+        "studentName": "Aditi Yadav",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_162",
+        "studentName": "Arjun Yadav",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_163",
+        "studentName": "Bhavna Yadav",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_164",
+        "studentName": "Chetan Yadav",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_165",
+        "studentName": "Deepak Yadav",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_166",
+        "studentName": "Ekta Yadav",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_167",
+        "studentName": "Gaurav Yadav",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_168",
+        "studentName": "Ishaan Yadav",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_169",
+        "studentName": "Meera Yadav",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_170",
+        "studentName": "Aarav Jain",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_171",
+        "studentName": "Aditi Jain",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_172",
+        "studentName": "Arjun Jain",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_173",
+        "studentName": "Bhavna Jain",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_174",
+        "studentName": "Chetan Jain",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_175",
+        "studentName": "Deepak Jain",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_176",
+        "studentName": "Ekta Jain",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_177",
+        "studentName": "Gaurav Jain",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_178",
+        "studentName": "Ishaan Jain",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_179",
+        "studentName": "Meera Jain",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_180",
+        "studentName": "Aarav Mehta",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_181",
+        "studentName": "Aditi Mehta",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_182",
+        "studentName": "Arjun Mehta",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_183",
+        "studentName": "Bhavna Mehta",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_184",
+        "studentName": "Chetan Mehta",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_185",
+        "studentName": "Deepak Mehta",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_186",
+        "studentName": "Ekta Mehta",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_187",
+        "studentName": "Gaurav Mehta",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_188",
+        "studentName": "Ishaan Mehta",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_189",
+        "studentName": "Meera Mehta",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_190",
+        "studentName": "Aarav Shah",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Withdrawn",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_191",
+        "studentName": "Aditi Shah",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_192",
+        "studentName": "Arjun Shah",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_193",
+        "studentName": "Bhavna Shah",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_194",
+        "studentName": "Chetan Shah",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_195",
+        "studentName": "Deepak Shah",
+        "category": "General",
+        "awardedProgramId": "lpp_002",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_196",
+        "studentName": "Ekta Shah",
+        "category": "OBC",
+        "awardedProgramId": "lpp_003",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_197",
+        "studentName": "Gaurav Shah",
+        "category": "SC/ST",
+        "awardedProgramId": "lpp_004",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_198",
+        "studentName": "Ishaan Shah",
+        "category": "NRI-American",
+        "awardedProgramId": "lpp_015",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_199",
+        "studentName": "Meera Shah",
+        "category": "NRI-Arab",
+        "awardedProgramId": "lpp_001",
+        "awardedPreferenceOrder": 2,
+        "acceptanceStatus": "Accepted",
+        "cycleAllotmentType": "Fresh"
+      },
+      {
+        "applicationId": "app_b_200",
+        "studentName": "Aarav Sharma",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_201",
+        "studentName": "Aditi Sharma",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_202",
+        "studentName": "Arjun Sharma",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_203",
+        "studentName": "Bhavna Sharma",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_204",
+        "studentName": "Chetan Sharma",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_205",
+        "studentName": "Deepak Sharma",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_206",
+        "studentName": "Ekta Sharma",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_207",
+        "studentName": "Gaurav Sharma",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_208",
+        "studentName": "Ishaan Sharma",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_209",
+        "studentName": "Meera Sharma",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_210",
+        "studentName": "Aarav Patel",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_211",
+        "studentName": "Aditi Patel",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_212",
+        "studentName": "Arjun Patel",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_213",
+        "studentName": "Bhavna Patel",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_214",
+        "studentName": "Chetan Patel",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_215",
+        "studentName": "Deepak Patel",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_216",
+        "studentName": "Ekta Patel",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_217",
+        "studentName": "Gaurav Patel",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_218",
+        "studentName": "Ishaan Patel",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_219",
+        "studentName": "Meera Patel",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_220",
+        "studentName": "Aarav Singh",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_221",
+        "studentName": "Aditi Singh",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_222",
+        "studentName": "Arjun Singh",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_223",
+        "studentName": "Bhavna Singh",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_224",
+        "studentName": "Chetan Singh",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_225",
+        "studentName": "Deepak Singh",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_226",
+        "studentName": "Ekta Singh",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_227",
+        "studentName": "Gaurav Singh",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_228",
+        "studentName": "Ishaan Singh",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_229",
+        "studentName": "Meera Singh",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_230",
+        "studentName": "Aarav Gupta",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_231",
+        "studentName": "Aditi Gupta",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_232",
+        "studentName": "Arjun Gupta",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_233",
+        "studentName": "Bhavna Gupta",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_234",
+        "studentName": "Chetan Gupta",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_235",
+        "studentName": "Deepak Gupta",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_236",
+        "studentName": "Ekta Gupta",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_237",
+        "studentName": "Gaurav Gupta",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_238",
+        "studentName": "Ishaan Gupta",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_239",
+        "studentName": "Meera Gupta",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_240",
+        "studentName": "Aarav Verma",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_241",
+        "studentName": "Aditi Verma",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_242",
+        "studentName": "Arjun Verma",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_243",
+        "studentName": "Bhavna Verma",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_244",
+        "studentName": "Chetan Verma",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_245",
+        "studentName": "Deepak Verma",
+        "category": "General",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_246",
+        "studentName": "Ekta Verma",
+        "category": "OBC",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_247",
+        "studentName": "Gaurav Verma",
+        "category": "SC/ST",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_248",
+        "studentName": "Ishaan Verma",
+        "category": "NRI-American",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      },
+      {
+        "applicationId": "app_b_249",
+        "studentName": "Meera Verma",
+        "category": "NRI-Arab",
+        "awardedProgramId": null,
+        "awardedPreferenceOrder": null,
+        "acceptanceStatus": "Pending",
+        "cycleAllotmentType": "Waitlisted"
+      }
+    ],
+    "summary": {
+      "released": 150,
+      "pending": 50,
+      "accepted": 90,
+      "withdrawn": 10
+    }
+  }
+]

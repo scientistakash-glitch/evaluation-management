@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
@@ -71,9 +71,9 @@ const SEED_READONLY: Record<string, any[]> = {
     { id: 'lpp_004', ptatId: 'ptat_001', name: 'B.Tech Civil',                    code: 'BTECH_CIVIL', duration: 4, fee: 680000,  totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
     { id: 'lpp_015', ptatId: 'ptat_001', name: 'B.Tech Information Technology',   code: 'BTECH_IT',    duration: 4, fee: 720000,  totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
     // M.Tech (3 programs)
-    { id: 'lpp_005', ptatId: 'ptat_002', name: 'M.Tech AI & ML',          code: 'MTECH_AI',    duration: 2, totalSeats:  40, categoryWiseSeats: catSeats(40),  createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-    { id: 'lpp_006', ptatId: 'ptat_002', name: 'M.Tech VLSI Design',      code: 'MTECH_VLSI',  duration: 2, totalSeats:  30, categoryWiseSeats: catSeats(30),  createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-    { id: 'lpp_007', ptatId: 'ptat_002', name: 'M.Tech Structural Engg',  code: 'MTECH_STR',   duration: 2, totalSeats:  25, categoryWiseSeats: catSeats(25),  createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_005', ptatId: 'ptat_002', name: 'M.Tech AI & ML',          code: 'MTECH_AI',    duration: 2, totalSeats:  40, categoryWiseSeats: catSeats(40),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 15 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 11 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 9 }, { name: 'American', category: 'NRI', approvedIntake: 3 }, { name: 'Arab', category: 'NRI', approvedIntake: 2 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_006', ptatId: 'ptat_002', name: 'M.Tech VLSI Design',      code: 'MTECH_VLSI',  duration: 2, totalSeats:  30, categoryWiseSeats: catSeats(30),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 11 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 8 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 7 }, { name: 'American', category: 'NRI', approvedIntake: 2 }, { name: 'Arab', category: 'NRI', approvedIntake: 2 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_007', ptatId: 'ptat_002', name: 'M.Tech Structural Engg',  code: 'MTECH_STR',   duration: 2, totalSeats:  25, categoryWiseSeats: catSeats(25),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 10 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 6 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 5 }, { name: 'American', category: 'NRI', approvedIntake: 2 }, { name: 'Arab', category: 'NRI', approvedIntake: 2 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
     // MBA (4 programs)
     { id: 'lpp_008', ptatId: 'ptat_003', name: 'MBA Finance',             code: 'MBA_FIN',     duration: 2, totalSeats:  80, categoryWiseSeats: catSeats(80),  createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
     { id: 'lpp_009', ptatId: 'ptat_003', name: 'MBA Human Resources',     code: 'MBA_HR',      duration: 2, totalSeats:  60, categoryWiseSeats: catSeats(60),  createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
@@ -276,6 +276,7 @@ const WRITABLE_KEYS = [
   'offer-releases.json',
   'cycle-comments.json',
   'fee-configs.json',
+  'applications.json',
 ];
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -302,6 +303,24 @@ export function resetStore(): void {
     try {
       fs.writeFileSync(path.join(DATA_DIR, key), '[]', 'utf-8');
     } catch { /* ignore */ }
+  }
+  // NEW: Trigger the demo seeding after reset
+  try {
+    execSync('node seed-demo.js', { cwd: process.cwd() });
+    console.log('RE-SEEDED demo data successfully. Syncing memory…');
+    // Important: Re-read the files into memory so that store is updated
+    for (const key of WRITABLE_KEYS) {
+      const filePath = path.join(DATA_DIR, key);
+      if (fs.existsSync(filePath)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+          store[key] = parsed;
+          storeInitialized[key] = true;
+        } catch { /* ignore parse errors */ }
+      }
+    }
+  } catch (err) {
+    console.error('Error re-seeding demo data:', err);
   }
 }
 

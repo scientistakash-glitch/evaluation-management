@@ -1,1 +1,19 @@
-[]
+[
+  {
+    "id": "btech-c1",
+    "name": "B.Tech Cycle 1",
+    "ptatId": "ptat_001",
+    "academicYear": "2026-2027",
+    "number": 1,
+    "status": "Released",
+    "lppIds": [
+      "lpp_001",
+      "lpp_002",
+      "lpp_003",
+      "lpp_004",
+      "lpp_015"
+    ],
+    "evaluationStrategy": "program-wise",
+    "createdAt": "2026-03-31T04:00:38.571Z"
+  }
+]

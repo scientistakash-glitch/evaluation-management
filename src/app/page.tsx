@@ -115,7 +115,7 @@ export default function CyclesPage() {
             className="btn-secondary"
             style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--color-text-muted)' }}
             onClick={async () => {
-              if (!confirm('Reset all data and start fresh?')) return;
+              if (!confirm('Re-seed the 1000+ student demo universe? This will wipe your current changes.')) return;
               await fetch('/api/reset', { method: 'POST' });
               localStorage.removeItem('create-cycle-draft');
               window.location.reload();
