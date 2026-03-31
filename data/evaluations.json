@@ -1,1 +1,62 @@
-[]
+[
+  {
+    "id": "eval_0YUG4oCp",
+    "cycleId": "cycle_iq3XXY9p",
+    "strategy": "single",
+    "programConfigs": [
+      {
+        "programId": "all",
+        "programName": "All Programs",
+        "weights": {
+          "entrance": 50,
+          "academic": 30,
+          "interview": 20
+        },
+        "scoresGenerated": false
+      }
+    ],
+    "tiebreakerRules": [
+      {
+        "order": 0,
+        "criterionId": "entrance",
+        "criterionName": "Entrance Score",
+        "direction": "DESC"
+      }
+    ],
+    "ranksGenerated": true,
+    "status": "Approved",
+    "createdAt": "2026-03-31T04:02:24.929Z",
+    "updatedAt": "2026-03-31T04:03:06.437Z",
+    "approvedAt": "2026-03-31T04:03:06.437Z"
+  },
+  {
+    "id": "eval_Jep-WW_6",
+    "cycleId": "cycle_3RkkyYZI",
+    "strategy": "single",
+    "programConfigs": [
+      {
+        "programId": "all",
+        "programName": "All Programs",
+        "weights": {
+          "entrance": 50,
+          "academic": 30,
+          "interview": 20
+        },
+        "scoresGenerated": false
+      }
+    ],
+    "tiebreakerRules": [
+      {
+        "order": 0,
+        "criterionId": "entrance",
+        "criterionName": "Entrance Score",
+        "direction": "DESC"
+      }
+    ],
+    "ranksGenerated": true,
+    "status": "Approved",
+    "createdAt": "2026-03-31T04:03:57.586Z",
+    "updatedAt": "2026-03-31T04:04:39.328Z",
+    "approvedAt": "2026-03-31T04:04:39.327Z"
+  }
+]
