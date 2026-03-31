@@ -230,9 +230,13 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
               }
             }
           } else {
-            // Server has no evaluation for this cycle — clear stale session entry
-            setEvaluation(null);
-            try { sessionStorage.removeItem(`cycle-${cycleId}`); } catch { /* ignore */ }
+            // Server has no evaluation for this cycle
+            // Only clear if session also has no evaluation — server empty may be ephemeral instance
+            if (!sessionData?.evaluation) {
+              setEvaluation(null);
+              try { sessionStorage.removeItem(`cycle-${cycleId}`); } catch { /* ignore */ }
+            }
+            // If session has the evaluation, keep it — the server may just be a fresh instance
           }
         }
       } catch {

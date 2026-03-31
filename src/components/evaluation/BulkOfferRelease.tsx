@@ -116,6 +116,16 @@ function getRemark(r: StudentOfferResult, prevWaitlistedIds: string[], hasPrev: 
   return '✦ Fresh Allotment';
 }
 
+// ── Category helpers ─────────────────────────────────────────────────────────
+
+function getCategoryInfo(raw: string): { category: string; subcategory: string } {
+  if (raw === 'NRI-American') return { category: 'NRI', subcategory: 'American' };
+  if (raw === 'NRI-Arab')     return { category: 'NRI', subcategory: 'Arab' };
+  if (raw === 'General' || raw === 'OBC' || raw === 'SC/ST')
+    return { category: 'Resident Indian', subcategory: raw };
+  return { category: raw, subcategory: raw };
+}
+
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -456,7 +466,6 @@ export default function BulkOfferRelease({
           : r
       )
     );
-    if (hasPreviousCycle) setUpgradeModalOpen(true);
   }
 
   async function handleRelease() {
@@ -715,7 +724,14 @@ export default function BulkOfferRelease({
                       </td>
                       {hasPreviousCycle && (
                         <td style={{ textAlign: 'center', fontWeight: eligibleForUpgrade > 0 ? 600 : 400, color: eligibleForUpgrade > 0 ? '#15803d' : 'var(--color-text-muted)' }}>
-                          {eligibleForUpgrade > 0 ? eligibleForUpgrade : '—'}
+                          {eligibleForUpgrade > 0 ? (
+                            <button
+                              onClick={() => setUpgradeModalOpen(true)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, color: '#15803d', fontSize: '12px', textDecoration: 'underline', padding: 0 }}
+                            >
+                              {eligibleForUpgrade}
+                            </button>
+                          ) : '—'}
                         </td>
                       )}
                       <td style={{ textAlign: 'center', fontWeight: 600, color: waitlisted > 0 ? '#b45309' : 'var(--color-text-muted)' }}>
@@ -797,7 +813,8 @@ export default function BulkOfferRelease({
                   <tr>
                     <th style={{ textAlign: 'left', minWidth: '160px' }}>Student Name</th>
                     <th style={{ textAlign: 'left', minWidth: '130px' }}>Application ID</th>
-                    <th style={{ textAlign: 'left' }}>Category</th>
+                    <th style={{ textAlign: 'left', minWidth: '130px' }}>Category</th>
+                    <th style={{ textAlign: 'left', minWidth: '90px'  }}>Subcategory</th>
                     <th style={{ textAlign: 'left', minWidth: '160px' }}>Program Offered</th>
                     <th style={{ textAlign: 'center' }}>Score</th>
                     {hasPreviousCycle && <>
@@ -821,11 +838,13 @@ export default function BulkOfferRelease({
                         feeAdjCell = <span style={{ color: 'var(--color-text-muted)' }}>No change</span>;
                       }
                     }
+                    const catInfo = getCategoryInfo(r.category);
                     return (
                       <tr key={r.applicationId}>
                         <td style={{ fontWeight: 600 }}>{r.studentName}</td>
                         <td style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-text-muted)' }}>{r.applicationId}</td>
-                        <td>{r.category}</td>
+                        <td style={{ fontWeight: 500 }}>{catInfo.category}</td>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{catInfo.subcategory}</td>
                         <td>{programName}</td>
                         <td style={{ textAlign: 'center' }}>{r.compositeScore.toFixed(1)}</td>
                         {hasPreviousCycle && <>
@@ -855,19 +874,24 @@ export default function BulkOfferRelease({
                         <tr>
                           <th style={{ textAlign: 'left' }}>Student Name</th>
                           <th style={{ textAlign: 'left' }}>Application ID</th>
-                          <th style={{ textAlign: 'left' }}>Category</th>
+                          <th style={{ textAlign: 'left', minWidth: '130px' }}>Category</th>
+                          <th style={{ textAlign: 'left', minWidth: '90px'  }}>Subcategory</th>
                           <th style={{ textAlign: 'center' }}>Score</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {waitlistedResults.map((r) => (
-                          <tr key={r.applicationId}>
-                            <td>{r.studentName}</td>
-                            <td style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-text-muted)' }}>{r.applicationId}</td>
-                            <td>{r.category}</td>
-                            <td style={{ textAlign: 'center' }}>{r.compositeScore.toFixed(1)}</td>
-                          </tr>
-                        ))}
+                        {waitlistedResults.map((r) => {
+                          const wCatInfo = getCategoryInfo(r.category);
+                          return (
+                            <tr key={r.applicationId}>
+                              <td>{r.studentName}</td>
+                              <td style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--color-text-muted)' }}>{r.applicationId}</td>
+                              <td style={{ fontWeight: 500 }}>{wCatInfo.category}</td>
+                              <td style={{ color: 'var(--color-text-muted)' }}>{wCatInfo.subcategory}</td>
+                              <td style={{ textAlign: 'center' }}>{r.compositeScore.toFixed(1)}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

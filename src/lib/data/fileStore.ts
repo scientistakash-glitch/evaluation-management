@@ -65,11 +65,11 @@ const SEED_READONLY: Record<string, any[]> = {
   // ── LPPs ───────────────────────────────────────────────────────────────────
   'lpps.json': [
     // B.Tech (5 programs)
-    { id: 'lpp_001', ptatId: 'ptat_001', name: 'B.Tech CSE',                      code: 'BTECH_CSE',   duration: 4, totalSeats: 120, categoryWiseSeats: catSeats(120), subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 46 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 32 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 27 }, { name: 'American', category: 'NRI', approvedIntake: 8 }, { name: 'Arab', category: 'NRI', approvedIntake: 7 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-    { id: 'lpp_002', ptatId: 'ptat_001', name: 'B.Tech Mechanical',               code: 'BTECH_MECH',  duration: 4, totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-    { id: 'lpp_003', ptatId: 'ptat_001', name: 'B.Tech ECE',                      code: 'BTECH_ECE',   duration: 4, totalSeats:  90, categoryWiseSeats: catSeats(90),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 34 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 24 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 21 }, { name: 'American', category: 'NRI', approvedIntake: 6 }, { name: 'Arab', category: 'NRI', approvedIntake: 5 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-    { id: 'lpp_004', ptatId: 'ptat_001', name: 'B.Tech Civil',                    code: 'BTECH_CIVIL', duration: 4, totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
-    { id: 'lpp_015', ptatId: 'ptat_001', name: 'B.Tech Information Technology',   code: 'BTECH_IT',    duration: 4, totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_001', ptatId: 'ptat_001', name: 'B.Tech CSE',                      code: 'BTECH_CSE',   duration: 4, fee: 780000,  totalSeats: 120, categoryWiseSeats: catSeats(120), subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 46 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 32 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 27 }, { name: 'American', category: 'NRI', approvedIntake: 8 }, { name: 'Arab', category: 'NRI', approvedIntake: 7 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_002', ptatId: 'ptat_001', name: 'B.Tech Mechanical',               code: 'BTECH_MECH',  duration: 4, fee: 700000,  totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_003', ptatId: 'ptat_001', name: 'B.Tech ECE',                      code: 'BTECH_ECE',   duration: 4, fee: 740000,  totalSeats:  90, categoryWiseSeats: catSeats(90),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 34 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 24 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 21 }, { name: 'American', category: 'NRI', approvedIntake: 6 }, { name: 'Arab', category: 'NRI', approvedIntake: 5 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_004', ptatId: 'ptat_001', name: 'B.Tech Civil',                    code: 'BTECH_CIVIL', duration: 4, fee: 680000,  totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+    { id: 'lpp_015', ptatId: 'ptat_001', name: 'B.Tech Information Technology',   code: 'BTECH_IT',    duration: 4, fee: 720000,  totalSeats:  60, categoryWiseSeats: catSeats(60),  subcategories: [{ name: 'General', category: 'Resident Indian', approvedIntake: 23 }, { name: 'OBC', category: 'Resident Indian', approvedIntake: 16 }, { name: 'SC/ST', category: 'Resident Indian', approvedIntake: 14 }, { name: 'American', category: 'NRI', approvedIntake: 4 }, { name: 'Arab', category: 'NRI', approvedIntake: 3 }], createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
     // M.Tech (3 programs)
     { id: 'lpp_005', ptatId: 'ptat_002', name: 'M.Tech AI & ML',          code: 'MTECH_AI',    duration: 2, totalSeats:  40, categoryWiseSeats: catSeats(40),  createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
     { id: 'lpp_006', ptatId: 'ptat_002', name: 'M.Tech VLSI Design',      code: 'MTECH_VLSI',  duration: 2, totalSeats:  30, categoryWiseSeats: catSeats(30),  createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
@@ -305,16 +305,24 @@ export function resetStore(): void {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+const storeInitialized: Record<string, boolean> = {};
+
 export async function readJson<T>(filename: string): Promise<T[]> {
   if (WRITABLE_KEYS.includes(filename)) {
-    const filePath = path.join(DATA_DIR, filename);
-    if (fs.existsSync(filePath)) {
-      try {
-        const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        store[filename] = parsed;
-        return parsed as T[];
-      } catch { /* fall through to in-memory */ }
+    // Only read from disk on the first call per key (cold start).
+    // After that, trust in-memory — disk writes silently fail on Vercel.
+    if (!storeInitialized[filename]) {
+      storeInitialized[filename] = true;
+      const filePath = path.join(DATA_DIR, filename);
+      if (fs.existsSync(filePath)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+          store[filename] = parsed;
+          return parsed as T[];
+        } catch { /* fall through to in-memory */ }
+      }
     }
+    return (store[filename] ?? []) as T[];
   }
   return (store[filename] ?? []) as T[];
 }

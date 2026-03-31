@@ -13,14 +13,18 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json();
-    const { installmentPlanId, installmentRows } = body;
-    if (!installmentPlanId || !Array.isArray(installmentRows)) {
-      return NextResponse.json({ error: 'installmentPlanId and installmentRows are required' }, { status: 400 });
+    const { installmentPlanId, categoryConfigs, installmentRows } = body;
+    if (!installmentPlanId) {
+      return NextResponse.json({ error: 'installmentPlanId is required' }, { status: 400 });
+    }
+    if (!Array.isArray(categoryConfigs) || categoryConfigs.length === 0) {
+      return NextResponse.json({ error: 'categoryConfigs are required' }, { status: 400 });
     }
     const config = await upsertFeeConfig({
       cycleId: params.id,
       installmentPlanId,
-      installmentRows,
+      categoryConfigs,
+      installmentRows: installmentRows ?? [],
     });
     return NextResponse.json(config, { status: 201 });
   } catch {
