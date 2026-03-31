@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllLpps, createLpp } from '@/lib/data/lpps';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

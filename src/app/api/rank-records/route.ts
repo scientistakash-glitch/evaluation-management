@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllRankRecords } from '@/lib/data/rankRecords';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCycleById, updateCycle, removeCycle, getAllCycles } from '@/lib/data/cycles';
 import { validateNonOverlapping } from '@/lib/utils/dateUtils';
+export const dynamic = 'force-dynamic';
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   try {

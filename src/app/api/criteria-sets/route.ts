@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllCriteriaSets, createCriteriaSet } from '@/lib/data/criteriaSets';
 import { validateWeightageSum } from '@/lib/utils/validators';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {

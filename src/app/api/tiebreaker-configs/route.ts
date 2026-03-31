@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTiebreakerConfigByEvaluationId, createTiebreakerConfig } from '@/lib/data/tiebreakerConfigs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

@@ -452,17 +452,21 @@ export default function CycleViewPage() {
       </div>
 
       {/* Footer action */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: displayStatus === 'Released' ? '24px' : 0 }}>
-        {displayStatus === 'Released' ? (
+      {/* NOTE: Use cycle.status (not displayStatus) so 'Planned+hasOffers' never
+           locks the user out. displayStatus='Released' is ambiguous — it fires for
+           both Planned+offers and for a truly-published cycle. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: cycle.status === 'Released' ? '24px' : 0 }}>
+        {cycle.status === 'Released' ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#276749', fontSize: '14px' }}>
             <span style={{ fontSize: '18px' }}>✓</span>
             <span>Offers released to students.</span>
           </div>
-        ) : displayStatus === 'Approved' ? (
+        ) : cycle.status === 'Approved' ? (
           <button className="btn-primary" onClick={handleRelease} disabled={releasing}>
             {releasing ? 'Releasing…' : 'Release Offers to Students →'}
           </button>
         ) : (
+          // 'Planned', 'Active', 'Closed' — always allow returning to evaluation
           <button className="btn-primary" onClick={() => router.push(`/cycle/${id}/evaluation`)}>
             {configRows && configRows.length > 0 ? 'Open Evaluation →' : 'Release Offers →'}
           </button>

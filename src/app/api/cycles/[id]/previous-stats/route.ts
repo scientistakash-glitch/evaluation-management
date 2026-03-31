@@ -3,6 +3,7 @@ import { getCycleById, getAllCycles } from '@/lib/data/cycles';
 import { getAllRankRecords } from '@/lib/data/rankRecords';
 import { getAllLpps } from '@/lib/data/lpps';
 import { getOfferReleaseByCycleId } from '@/lib/data/offerReleases';
+export const dynamic = 'force-dynamic';
 
 const DEFAULT_INTAKE = 60;
 

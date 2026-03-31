@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllEvaluations, createEvaluation } from '@/lib/data/evaluations';
 import type { EvaluationStrategy } from '@/types';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

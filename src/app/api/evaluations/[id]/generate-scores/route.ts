@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { computeScores } from '@/lib/engine/scoreEngine';
 import { createBatch, deleteByEvaluationAndProgram } from '@/lib/data/evaluationScores';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {

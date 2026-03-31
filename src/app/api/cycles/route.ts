@@ -3,6 +3,7 @@ import { getAllCycles, createCycle } from '@/lib/data/cycles';
 import { createEvaluation } from '@/lib/data/evaluations';
 import { validateNonOverlapping } from '@/lib/utils/dateUtils';
 import type { CycleStatus } from '@/types';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

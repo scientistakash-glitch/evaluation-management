@@ -53,6 +53,7 @@ function buildInstallmentRows(planId: string, programFee: number): InstallmentRo
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function FeeConfig({ cycleId, onSaved }: Props) {
+  const [configMode, setConfigMode] = useState<'group' | 'per-program'>('group');
   const [rowConfigs, setRowConfigs] = useState<RowConfig[]>([]);
   const [saving,  setSaving]  = useState(false);
   const [loading, setLoading] = useState(true);
@@ -112,34 +113,47 @@ export default function FeeConfig({ cycleId, onSaved }: Props) {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   function setPlan(programId: string, subcategory: string, planId: string) {
-    setRowConfigs((prev) => prev.map((r) =>
-      r.programId !== programId || r.subcategory !== subcategory ? r : {
+    setRowConfigs((prev) => prev.map((r) => {
+      if (r.subcategory !== subcategory) return r;
+      if (configMode === 'per-program' && r.programId !== programId) return r;
+      return {
         ...r,
         installmentPlanId: planId,
         installmentRows: buildInstallmentRows(planId, r.programFee),
-      }
-    ));
-  }
-
-  function setAmount(programId: string, subcategory: string, idx: number, amount: number) {
-    setRowConfigs((prev) => prev.map((r) => {
-      if (r.programId !== programId || r.subcategory !== subcategory) return r;
-      const newRows = r.installmentRows.map((row, i) => {
-        if (i !== idx) return row;
-        const pct = r.programFee > 0 ? Math.round((amount / r.programFee) * 1000) / 10 : 0;
-        return { ...row, amount, pct };
-      });
-      return { ...r, installmentRows: newRows };
+      };
     }));
   }
 
+  function setAmount(programId: string, subcategory: string, idx: number, amount: number) {
+    setRowConfigs((prev) => {
+      const refRow = prev.find((r) => r.programId === programId && r.subcategory === subcategory);
+      if (!refRow) return prev;
+      const pct = refRow.programFee > 0 ? (amount / refRow.programFee) : 0;
+
+      return prev.map((r) => {
+        if (r.subcategory !== subcategory) return r;
+        if (configMode === 'per-program' && r.programId !== programId) return r;
+
+        const newRows = r.installmentRows.map((row, i) => {
+          if (i !== idx) return row;
+          const targetAmount = (r.programId === programId) ? amount : Math.round(r.programFee * pct);
+          const targetPct = Math.round(pct * 1000) / 10;
+          return { ...row, amount: targetAmount, pct: targetPct };
+        });
+        return { ...r, installmentRows: newRows };
+      });
+    });
+  }
+
   function setDueDate(programId: string, subcategory: string, idx: number, dueDate: string) {
-    setRowConfigs((prev) => prev.map((r) =>
-      r.programId !== programId || r.subcategory !== subcategory ? r : {
+    setRowConfigs((prev) => prev.map((r) => {
+      if (r.subcategory !== subcategory) return r;
+      if (configMode === 'per-program' && r.programId !== programId) return r;
+      return {
         ...r,
         installmentRows: r.installmentRows.map((row, i) => i === idx ? { ...row, dueDate } : row),
-      }
-    ));
+      };
+    }));
   }
 
   // ── Validation ───────────────────────────────────────────────────────────────
@@ -213,15 +227,28 @@ export default function FeeConfig({ cycleId, onSaved }: Props) {
             fontSize: '12px', color: '#15803d',
           }}>
             <span>✓</span>
-            <span><b>{doneCount}</b> of {rowConfigs.length} subcategories fully configured</span>
+            <span><b>{doneCount}</b> of {rowConfigs.length} subcategory permutations fully configured</span>
           </div>
         )}
+
+        {/* Configuration Mode Toggle */}
+        <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
+          <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '10px' }}>Configuration Mode</div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginBottom: '8px', cursor: 'pointer' }}>
+            <input type="radio" name="mode" checked={configMode === 'group'} onChange={() => setConfigMode('group')} />
+            <div><b>Set fees for entire Program Group in one go</b> — One plan + one set of amounts/dates applies to ALL programs</div>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+            <input type="radio" name="mode" checked={configMode === 'per-program'} onChange={() => setConfigMode('per-program')} />
+            <div><b>Set fees per Program independently</b> — Each program row has its own plan, amounts and due dates</div>
+          </label>
+        </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table" style={{ fontSize: '12px', whiteSpace: 'nowrap', width: '100%' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left',  minWidth: '140px' }}>Program</th>
+                {configMode === 'per-program' && <th style={{ textAlign: 'left',  minWidth: '140px' }}>Program</th>}
                 <th style={{ textAlign: 'left',  minWidth: '130px' }}>Category</th>
                 <th style={{ textAlign: 'left',  minWidth: '90px'  }}>Subcategory</th>
                 <th style={{ textAlign: 'right', minWidth: '110px' }}>Program Fee</th>
@@ -234,30 +261,37 @@ export default function FeeConfig({ cycleId, onSaved }: Props) {
               </tr>
             </thead>
             <tbody>
-              {rowConfigs.map((row, rowIdx) => {
-                const prevRow       = rowConfigs[rowIdx - 1];
-                const isNewProgram  = !prevRow || prevRow.programId !== row.programId;
-                const isNewCategory = !prevRow || prevRow.programId !== row.programId || prevRow.category !== row.category;
-                const done          = isRowDone(row);
-                const total         = row.installmentRows.reduce((s, r) => s + r.amount, 0);
-                const totalOk       = Math.abs(total - row.programFee) <= 1;
-                const hasInst       = row.installmentRows.length > 0;
+              {(() => {
+                const displayRows = configMode === 'group'
+                  ? rowConfigs.filter((r, i, arr) => arr.findIndex((x) => x.subcategory === r.subcategory) === i)
+                  : rowConfigs;
 
-                // ── Main subcategory row ───────────────────────────────────
-                const mainRow = (
-                  <tr
-                    key={`main-${row.programId}-${row.subcategory}`}
-                    style={{ borderTop: isNewProgram && rowIdx > 0 ? '2px solid var(--color-border)' : undefined }}
-                  >
-                    {/* Program */}
-                    <td style={{
-                      fontWeight: isNewProgram ? 700 : 400,
-                      color: isNewProgram ? 'var(--color-primary)' : 'transparent',
-                      borderLeft: isNewProgram ? '3px solid var(--color-primary)' : '3px solid transparent',
-                      paddingLeft: '10px',
-                    }}>
-                      {isNewProgram ? row.programName : ''}
-                    </td>
+                return displayRows.map((row, rowIdx) => {
+                  const prevRow       = displayRows[rowIdx - 1];
+                  const isNewProgram  = !prevRow || prevRow.programId !== row.programId;
+                  const isNewCategory = !prevRow || prevRow.programId !== row.programId || prevRow.category !== row.category;
+                  const done          = isRowDone(row);
+                  const total         = row.installmentRows.reduce((s, r) => s + r.amount, 0);
+                  const totalOk       = Math.abs(total - row.programFee) <= 1;
+                  const hasInst       = row.installmentRows.length > 0;
+
+                  // ── Main subcategory row ───────────────────────────────────
+                  const mainRow = (
+                    <tr
+                      key={`main-${row.programId}-${row.subcategory}`}
+                      style={{ borderTop: (configMode === 'per-program' && isNewProgram && rowIdx > 0) ? '2px solid var(--color-border)' : undefined }}
+                    >
+                      {/* Program */}
+                      {configMode === 'per-program' && (
+                        <td style={{
+                          fontWeight: isNewProgram ? 700 : 400,
+                          color: isNewProgram ? 'var(--color-primary)' : 'transparent',
+                          borderLeft: isNewProgram ? '3px solid var(--color-primary)' : '3px solid transparent',
+                          paddingLeft: '10px',
+                        }}>
+                          {isNewProgram ? row.programName : ''}
+                        </td>
+                      )}
                     {/* Category */}
                     <td style={{ color: isNewCategory ? 'var(--color-text)' : 'transparent', fontWeight: 500 }}>
                       {isNewCategory ? row.category : ''}
@@ -294,59 +328,60 @@ export default function FeeConfig({ cycleId, onSaved }: Props) {
                   </tr>
                 );
 
-                if (!hasInst) return <React.Fragment key={`${row.programId}-${row.subcategory}`}>{mainRow}</React.Fragment>;
+                  if (!hasInst) return <React.Fragment key={`${row.programId}-${row.subcategory}`}>{mainRow}</React.Fragment>;
 
-                // ── Installment sub-rows ───────────────────────────────────
-                const instRows = row.installmentRows.map((inst, i) => (
-                  <tr key={`inst-${row.programId}-${row.subcategory}-${i}`} style={{ background: '#fafafa' }}>
-                    {/* Program, Category, Subcategory, Fee: empty */}
-                    <td /><td /><td /><td />
-                    {/* Plan col: show total on last installment */}
-                    <td style={{ paddingLeft: '20px', fontSize: '11px' }}>
-                      {i === row.installmentRows.length - 1 ? (
-                        <span style={{ fontWeight: 600, color: totalOk ? '#15803d' : '#c53030' }}>
-                          Total: ₹{total.toLocaleString('en-IN')} {totalOk ? '✓' : `(need ₹${row.programFee.toLocaleString('en-IN')})`}
-                        </span>
-                      ) : null}
-                    </td>
-                    {/* # */}
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--color-primary)' }}>{i + 1}</td>
-                    {/* Amount — EDITABLE */}
-                    <td style={{ textAlign: 'right' }}>
-                      <input
-                        type="number"
-                        className="form-input"
-                        style={{ width: '100px', padding: '3px 8px', fontSize: '12px', textAlign: 'right' }}
-                        value={inst.amount}
-                        min={0}
-                        onChange={(e) => setAmount(row.programId, row.subcategory, i, parseInt(e.target.value) || 0)}
-                      />
-                    </td>
-                    {/* % — auto */}
-                    <td style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>
-                      {inst.pct}%
-                    </td>
-                    {/* Due Date — datetime-local */}
-                    <td>
-                      <input
-                        type="datetime-local"
-                        className="form-input"
-                        style={{ fontSize: '12px', padding: '3px 6px', width: '190px' }}
-                        value={inst.dueDate}
-                        onChange={(e) => setDueDate(row.programId, row.subcategory, i, e.target.value)}
-                      />
-                    </td>
-                    <td />
-                  </tr>
-                ));
+                  // ── Installment sub-rows ───────────────────────────────────
+                  const instRows = row.installmentRows.map((inst, i) => (
+                    <tr key={`inst-${row.programId}-${row.subcategory}-${i}`} style={{ background: '#fafafa' }}>
+                      {/* Colspans shift based on mode */}
+                      {configMode === 'per-program' && <td />}<td /><td /><td />
+                      {/* Plan col: show total on last installment */}
+                      <td style={{ paddingLeft: '20px', fontSize: '11px' }}>
+                        {i === row.installmentRows.length - 1 ? (
+                          <span style={{ fontWeight: 600, color: totalOk ? '#15803d' : '#c53030' }}>
+                            Total: ₹{total.toLocaleString('en-IN')} {totalOk ? '✓' : `(need ₹${row.programFee.toLocaleString('en-IN')})`}
+                          </span>
+                        ) : null}
+                      </td>
+                      {/* # */}
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--color-primary)' }}>{i + 1}</td>
+                      {/* Amount — EDITABLE */}
+                      <td style={{ textAlign: 'right' }}>
+                        <input
+                          type="number"
+                          className="form-input"
+                          style={{ width: '100px', padding: '3px 8px', fontSize: '12px', textAlign: 'right' }}
+                          value={inst.amount}
+                          min={0}
+                          onChange={(e) => setAmount(row.programId, row.subcategory, i, parseInt(e.target.value) || 0)}
+                        />
+                      </td>
+                      {/* % — auto */}
+                      <td style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>
+                        {inst.pct}%
+                      </td>
+                      {/* Due Date — datetime-local */}
+                      <td>
+                        <input
+                          type="datetime-local"
+                          className="form-input"
+                          style={{ fontSize: '12px', padding: '3px 6px', width: '190px' }}
+                          value={inst.dueDate}
+                          onChange={(e) => setDueDate(row.programId, row.subcategory, i, e.target.value)}
+                        />
+                      </td>
+                      <td />
+                    </tr>
+                  ));
 
-                return (
-                  <React.Fragment key={`${row.programId}-${row.subcategory}`}>
-                    {mainRow}
-                    {instRows}
-                  </React.Fragment>
-                );
-              })}
+                  return (
+                    <React.Fragment key={`group-${row.programId}-${row.subcategory}`}>
+                      {mainRow}
+                      {instRows}
+                    </React.Fragment>
+                  );
+                });
+              })()}
             </tbody>
           </table>
         </div>

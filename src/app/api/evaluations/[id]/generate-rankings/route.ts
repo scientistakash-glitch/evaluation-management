@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { computeRankings } from '@/lib/engine/rankEngine';
 import { createBatch, deleteByEvaluationAndProgram } from '@/lib/data/rankRecords';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {

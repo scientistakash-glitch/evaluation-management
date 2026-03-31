@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 // This route is deprecated. Use /api/evaluations/[id]/generate-rankings instead.
 export async function POST(_request: NextRequest, { params: _params }: { params: { id: string } }) {

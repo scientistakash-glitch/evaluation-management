@@ -52,9 +52,9 @@ export default function CyclesPage() {
       setIsLoading(true);
       try {
         const [cyclesRes, ptatsRes, lppsRes] = await Promise.all([
-          fetch('/api/cycles').then((r) => r.json()),
-          fetch('/api/ptats').then((r) => r.json()),
-          fetch('/api/lpps').then((r) => r.json()),
+          fetch('/api/cycles', { cache: 'no-store' }).then((r) => r.json()),
+          fetch('/api/ptats', { cache: 'no-store' }).then((r) => r.json()),
+          fetch('/api/lpps', { cache: 'no-store' }).then((r) => r.json()),
         ]);
         const cyclesList: Cycle[] = Array.isArray(cyclesRes) ? cyclesRes : [];
         setCycles(cyclesList);
@@ -64,7 +64,7 @@ export default function CyclesPage() {
         // Load offer data from server for each cycle
         if (cyclesList.length > 0) {
           const offerPromises = cyclesList.map((c) =>
-            fetch(`/api/cycles/${c.id}/offer-release`).then((r) => r.ok ? r.json() : null).catch(() => null)
+            fetch(`/api/cycles/${c.id}/offer-release`, { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).catch(() => null)
           );
           const offerResults = await Promise.all(offerPromises);
           const overrides: Record<string, { released: number; accepted: number; pending: number; withdrawn: number }> = {};

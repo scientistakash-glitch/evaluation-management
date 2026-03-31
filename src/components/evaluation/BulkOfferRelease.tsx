@@ -468,19 +468,23 @@ export default function BulkOfferRelease({
     );
   }
 
+  // Maps LPP subcategoryName to the application.category value used in rank records
+  function subcategoryToAppCategory(sub: string): string {
+    if (sub === 'American') return 'NRI-American';
+    if (sub === 'Arab')     return 'NRI-Arab';
+    return sub; // General, OBC, SC/ST are identical
+  }
+
   async function handleRelease() {
-    const algoRows: AlgoRow[] = [];
-    for (const pid of programIds) {
-      const lpp = fullLpps.find((l) => l.id === pid);
-      if (!lpp) continue;
-      for (const cat of RESERVATION_CATEGORIES) {
-        algoRows.push({
-          programId: pid, programName: lpp.name, category: cat,
-          availableSeats: lpp.categoryWiseSeats[cat] ?? 0,
-          offersToRelease: lpp.categoryWiseSeats[cat] ?? 0,
-        });
-      }
-    }
+    // Build algoRows from configRows so user-entered offersToRelease values are respected
+    const algoRows: AlgoRow[] = configRows.map((row) => ({
+      programId: row.programId,
+      programName: row.programName,
+      // subcategoryName ('American','Arab') must map to app.category ('NRI-American','NRI-Arab')
+      category: subcategoryToAppCategory(row.subcategoryName),
+      availableSeats: hasPreviousCycle ? row.availableSeats : row.approvedIntake,
+      offersToRelease: row.offersToRelease,
+    }));
 
     const offerResults = releaseOffers(algoRows, rankRecords, appMap, prevCycleData, prevCycleData?.prevCycleId ?? null, fullLpps);
     setResults(offerResults);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCycleById, updateCycle } from '@/lib/data/cycles';
+export const dynamic = 'force-dynamic';
 
 export async function POST(_: NextRequest, { params }: { params: { id: string } }) {
   try {
