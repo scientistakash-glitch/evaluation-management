@@ -253,6 +253,10 @@ export default function CreateCyclePage() {
       const appsRes = await fetch('/api/applications');
       if (!appsRes.ok) throw new Error('Failed to fetch applications');
       const allApps = await appsRes.json();
+      
+      if (!Array.isArray(allApps) || allApps.length === 0) {
+        throw new Error('Database returned 0 applications for ranking process. Please verify demo data was seeded.');
+      }
 
       // In "previous" mode, filter out students already offered in the previous cycle
       let filteredApps = allApps;
