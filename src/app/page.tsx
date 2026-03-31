@@ -48,7 +48,22 @@ export default function CyclesPage() {
   const [hasDraft, setHasDraft] = useState(false);
 
   useEffect(() => {
-    async function load() {
+    async function initSession() {
+      // 1. Check for active session
+      if (!sessionStorage.getItem('DEMO_SESSION_ACTIVE')) {
+        console.log('NEW SESSION DETECTED: Initialization and reset handshake…');
+        try {
+          // Clear backend
+          await fetch('/api/reset', { method: 'POST' });
+          // Clear local browser storage
+          localStorage.clear();
+          sessionStorage.clear();
+          // Mark session active
+          sessionStorage.setItem('DEMO_SESSION_ACTIVE', 'true');
+        } catch { /* if reset fails, keep going */ }
+      }
+
+      // 2. Fetch data (cycles, ptats, lpps)
       setIsLoading(true);
       try {
         const [cyclesRes, ptatsRes, lppsRes] = await Promise.all([
@@ -73,11 +88,13 @@ export default function CyclesPage() {
           });
           setOfferOverrides(overrides);
         }
+      } catch (err) {
+        console.error('Failed to load cycles:', err);
       } finally {
         setIsLoading(false);
       }
     }
-    load();
+    initSession();
     setHasDraft(!!localStorage.getItem('create-cycle-draft'));
   }, []);
 

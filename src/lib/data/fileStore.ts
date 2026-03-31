@@ -295,8 +295,10 @@ const store: Record<string, any[]> = {
 };
 
 export function resetStore(): void {
+  console.log('RESETTING STORE: Clearing all session-based data…');
   for (const key of WRITABLE_KEYS) {
     store[key] = [];
+    storeInitialized[key] = true; // Mark as initialized so it doesn't re-read old disk data
     try {
       fs.writeFileSync(path.join(DATA_DIR, key), '[]', 'utf-8');
     } catch { /* ignore */ }

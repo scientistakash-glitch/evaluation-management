@@ -193,7 +193,15 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
         // Fetch cycle + ptat + lpps only if not already in session
         if (!sessionData?.cycle) {
           const cycleRes = await fetch(`/api/cycles/${cycleId}`);
-          if (!cycleRes.ok) { setLoadError('Cycle not found.'); setLoaded(true); return; }
+          if (!cycleRes.ok) {
+            console.warn('Cycle not found in backend, clearing session cache…');
+            try { sessionStorage.removeItem(`cycle-${cycleId}`); } catch { /* ignore */ }
+            setLoadError('Cycle not found or session expired.');
+            showToast('Session expired — redirecting to home', 'error');
+            setTimeout(() => router.push('/'), 1500);
+            setLoaded(true);
+            return;
+          }
           const cycleData = await cycleRes.json();
           setCycle(cycleData);
 
@@ -233,8 +241,11 @@ export default function EvaluationWorkflow({ cycleId }: Props) {
             // Server has no evaluation for this cycle
             // Only clear if session also has no evaluation — server empty may be ephemeral instance
             if (!sessionData?.evaluation) {
+              console.warn('No evaluation found for cycle, clearing…');
               setEvaluation(null);
               try { sessionStorage.removeItem(`cycle-${cycleId}`); } catch { /* ignore */ }
+              showToast('Evaluation session ended — redirecting to home', 'error');
+              setTimeout(() => router.push('/'), 1500);
             }
             // If session has the evaluation, keep it — the server may just be a fresh instance
           }
