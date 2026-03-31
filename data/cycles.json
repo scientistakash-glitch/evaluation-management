@@ -1,7 +1,7 @@
 [
   {
     "id": "btech-c1",
-    "name": "B.Tech Cycle 1",
+    "name": "B.Tech – 2026-2027 – Cycle 1",
     "ptatId": "ptat_001",
     "academicYear": "2026-2027",
     "number": 1,
@@ -14,86 +14,6 @@
       "lpp_015"
     ],
     "evaluationStrategy": "program-wise",
-    "createdAt": "2026-03-31T04:02:09.795Z"
-  },
-  {
-    "id": "cycle_iq3XXY9p",
-    "name": "M.Tech – 2026-2027 – Cycle 1",
-    "number": 1,
-    "academicYear": "2026-2027",
-    "hasPreviousCycle": false,
-    "ptatId": "ptat_002",
-    "lppIds": [
-      "lpp_005",
-      "lpp_006",
-      "lpp_007"
-    ],
-    "timeline": {
-      "applicationPeriod": {
-        "start": "",
-        "end": ""
-      },
-      "scoringPeriod": {
-        "start": "",
-        "end": ""
-      },
-      "offerReleasePeriod": {
-        "start": "",
-        "end": ""
-      },
-      "acceptancePeriod": {
-        "start": "",
-        "end": ""
-      },
-      "paymentPeriod": {
-        "start": "",
-        "end": ""
-      }
-    },
-    "evaluationStrategy": "single",
-    "status": "Released",
-    "createdAt": "2026-03-31T04:02:24.928Z",
-    "updatedAt": "2026-03-31T04:03:19.902Z"
-  },
-  {
-    "id": "cycle_3RkkyYZI",
-    "name": "B.Tech – 2026-2027 – Cycle 2",
-    "number": 2,
-    "academicYear": "2026-2027",
-    "hasPreviousCycle": true,
-    "ptatId": "ptat_001",
-    "lppIds": [
-      "lpp_001",
-      "lpp_002",
-      "lpp_003",
-      "lpp_004",
-      "lpp_015"
-    ],
-    "timeline": {
-      "applicationPeriod": {
-        "start": "",
-        "end": ""
-      },
-      "scoringPeriod": {
-        "start": "",
-        "end": ""
-      },
-      "offerReleasePeriod": {
-        "start": "",
-        "end": ""
-      },
-      "acceptancePeriod": {
-        "start": "",
-        "end": ""
-      },
-      "paymentPeriod": {
-        "start": "",
-        "end": ""
-      }
-    },
-    "evaluationStrategy": "single",
-    "status": "Released",
-    "createdAt": "2026-03-31T04:03:57.584Z",
-    "updatedAt": "2026-03-31T04:04:43.915Z"
+    "createdAt": "2026-03-31T15:31:10.899Z"
   }
 ]
