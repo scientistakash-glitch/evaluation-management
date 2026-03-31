@@ -68,6 +68,9 @@ export default function CreateCyclePage() {
     { order: 0, criterionId: 'entrance', criterionName: 'Entrance Score', direction: 'DESC' },
   ]);
 
+  // Submission Lock
+  const submitLockRef = React.useRef(false);
+
   // Submission
   const [submitting, setSubmitting] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -201,6 +204,8 @@ export default function CreateCyclePage() {
   // ── Submit ───────────────────────────────────────────────────────────────────
 
   async function handleSubmit() {
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setSubmitting(true);
     setError('');
     try {
@@ -289,7 +294,10 @@ export default function CreateCyclePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ programId: pc.programId, weights: pc.weights, applications: programApps }),
         });
-        if (!scoreRes.ok) throw new Error('Score generation failed');
+        if (!scoreRes.ok) {
+          const txt = await scoreRes.text().catch(() => 'unknown');
+          throw new Error(`Score generation failed: ${scoreRes.status} ${txt}`);
+        }
         const scores = await scoreRes.json();
 
         const rankRes = await fetch(`/api/evaluations/${evaluation.id}/generate-rankings`, {
@@ -301,7 +309,10 @@ export default function CreateCyclePage() {
             evaluationScores: scores, applications: programApps,
           }),
         });
-        if (!rankRes.ok) throw new Error('Ranking generation failed');
+        if (!rankRes.ok) {
+          const txt = await rankRes.text().catch(() => 'unknown');
+          throw new Error(`Ranking generation failed: ${rankRes.status} ${txt}`);
+        }
         const rankings = await rankRes.json();
         allRankRecords.push(...(Array.isArray(rankings) ? rankings : []));
       }
@@ -328,6 +339,7 @@ export default function CreateCyclePage() {
     } finally {
       setSubmitting(false);
       setGenerating(false);
+      submitLockRef.current = false;
     }
   }
 
