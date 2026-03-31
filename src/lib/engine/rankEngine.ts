@@ -51,7 +51,7 @@ export function computeRankings(
   applications: ApplicationInput[]
 ): Omit<RankRecord, 'createdAt' | 'updatedAt'>[] {
   if (evaluationScores.length === 0) {
-    throw new Error('No scores provided for ranking');
+    return [];
   }
 
   const sortedRules = [...tiebreakerRules].sort((a, b) => a.order - b.order);

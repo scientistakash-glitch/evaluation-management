@@ -251,7 +251,8 @@ export default function CreateCyclePage() {
       showToast(generationMode === 'previous' ? 'Importing previous cycle rankings…' : 'Generating scores and rankings…', 'info');
 
       const appsRes = await fetch('/api/applications');
-      const allApps = appsRes.ok ? await appsRes.json() : [];
+      if (!appsRes.ok) throw new Error('Failed to fetch applications');
+      const allApps = await appsRes.json();
 
       // In "previous" mode, filter out students already offered in the previous cycle
       let filteredApps = allApps;
