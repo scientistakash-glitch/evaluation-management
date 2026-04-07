@@ -1,6 +1,5 @@
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
@@ -276,7 +275,6 @@ const WRITABLE_KEYS = [
   'offer-releases.json',
   'cycle-comments.json',
   'fee-configs.json',
-  'applications.json',
 ];
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -295,6 +293,10 @@ const store: Record<string, any[]> = {
   'fee-configs.json':        [],
 };
 
+// ── Public API ────────────────────────────────────────────────────────────────
+
+const storeInitialized: Record<string, boolean> = {};
+
 export function resetStore(): void {
   console.log('RESETTING STORE: Clearing all session-based data…');
   for (const key of WRITABLE_KEYS) {
@@ -304,29 +306,7 @@ export function resetStore(): void {
       fs.writeFileSync(path.join(DATA_DIR, key), '[]', 'utf-8');
     } catch { /* ignore */ }
   }
-  // NEW: Trigger the demo seeding after reset
-  try {
-    execSync('node seed-demo.js', { cwd: process.cwd() });
-    console.log('RE-SEEDED demo data successfully. Syncing memory…');
-    // Important: Re-read the files into memory so that store is updated
-    for (const key of WRITABLE_KEYS) {
-      const filePath = path.join(DATA_DIR, key);
-      if (fs.existsSync(filePath)) {
-        try {
-          const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-          store[key] = parsed;
-          storeInitialized[key] = true;
-        } catch { /* ignore parse errors */ }
-      }
-    }
-  } catch (err) {
-    console.error('Error re-seeding demo data:', err);
-  }
 }
-
-// ── Public API ────────────────────────────────────────────────────────────────
-
-const storeInitialized: Record<string, boolean> = {};
 
 export async function readJson<T>(filename: string): Promise<T[]> {
   if (WRITABLE_KEYS.includes(filename)) {

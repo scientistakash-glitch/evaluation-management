@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import ProcessingOverlay from '@/components/common/ProcessingOverlay';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -366,6 +367,7 @@ export default function BulkOfferRelease({
 
   const [configRows, setConfigRows] = useState<OfferConfigRow[]>(defaultConfig);
   const [results, setResults] = useState<StudentOfferResult[] | null>(null);
+  const [releasing, setReleasing] = useState(false);
   const [prevCycleData, setPrevCycleData] = useState<PrevCycleData | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [waitlistedExpanded, setWaitlistedExpanded] = useState(false);
@@ -476,33 +478,42 @@ export default function BulkOfferRelease({
   }
 
   async function handleRelease() {
-    // Build algoRows from configRows so user-entered offersToRelease values are respected
-    const algoRows: AlgoRow[] = configRows.map((row) => ({
-      programId: row.programId,
-      programName: row.programName,
-      // subcategoryName ('American','Arab') must map to app.category ('NRI-American','NRI-Arab')
-      category: subcategoryToAppCategory(row.subcategoryName),
-      availableSeats: hasPreviousCycle ? row.availableSeats : row.approvedIntake,
-      offersToRelease: row.offersToRelease,
-    }));
-
-    const offerResults = releaseOffers(algoRows, rankRecords, appMap, prevCycleData, prevCycleData?.prevCycleId ?? null, fullLpps);
-    setResults(offerResults);
-
-    const totalOffered = offerResults.filter((r) => r.awardedProgramId !== null).length;
-    const summary = { released: totalOffered, pending: totalOffered, accepted: 0, withdrawn: 0 };
+    setReleasing(true);
+    // Yield to React so the overlay renders before heavy computation
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     try {
-      await fetch(`/api/cycles/${cycleId}/offer-release`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ configRows, summary, studentResults: offerResults }),
-      });
-    } catch { /* ignore */ }
+      // Build algoRows from configRows so user-entered offersToRelease values are respected
+      const algoRows: AlgoRow[] = configRows.map((row) => ({
+        programId: row.programId,
+        programName: row.programName,
+        // subcategoryName ('American','Arab') must map to app.category ('NRI-American','NRI-Arab')
+        category: subcategoryToAppCategory(row.subcategoryName),
+        availableSeats: hasPreviousCycle ? row.availableSeats : row.approvedIntake,
+        offersToRelease: row.offersToRelease,
+      }));
 
-    try {
-      sessionStorage.setItem(`cycle-${cycleId}-offers`, JSON.stringify(summary));
-      sessionStorage.setItem(`cycle-${cycleId}-configRows`, JSON.stringify(configRows));
-    } catch { /* ignore */ }
+      const offerResults = releaseOffers(algoRows, rankRecords, appMap, prevCycleData, prevCycleData?.prevCycleId ?? null, fullLpps);
+
+      const totalOffered = offerResults.filter((r) => r.awardedProgramId !== null).length;
+      const summary = { released: totalOffered, pending: totalOffered, accepted: 0, withdrawn: 0 };
+
+      try {
+        await fetch(`/api/cycles/${cycleId}/offer-release`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ configRows, summary, studentResults: offerResults }),
+        });
+      } catch { /* ignore */ }
+
+      try {
+        sessionStorage.setItem(`cycle-${cycleId}-offers`, JSON.stringify(summary));
+        sessionStorage.setItem(`cycle-${cycleId}-configRows`, JSON.stringify(configRows));
+      } catch { /* ignore */ }
+
+      setResults(offerResults);
+    } finally {
+      setReleasing(false);
+    }
   }
 
   function handleDownloadUpgradeCSV() {
@@ -561,6 +572,22 @@ export default function BulkOfferRelease({
   const waitlistedResults = results?.filter((r) => r.awardedProgramId === null) ?? [];
 
   const upgradeEligibleCount = upgradePreview.filter((r) => r.canUpgrade).length;
+
+  if (releasing) {
+    return (
+      <ProcessingOverlay
+        title="Releasing Offers"
+        subtitle="Allocating seats based on merit, category quotas, and preferences."
+        steps={[
+          'Analysing seat availability',
+          'Processing upgrades',
+          'Allocating fresh offers',
+          'Updating waitlist',
+          'Saving results',
+        ]}
+      />
+    );
+  }
 
   return (
     <div>
@@ -749,7 +776,7 @@ export default function BulkOfferRelease({
           </div>
 
           <div style={{ marginTop: '20px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button className="btn-primary" onClick={handleRelease} style={{ padding: '10px 28px', fontSize: '14px' }}>
+            <button className="btn-primary" onClick={handleRelease} disabled={releasing} style={{ padding: '10px 28px', fontSize: '14px' }}>
               Release Offers
             </button>
             <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>

@@ -1,1 +1,387 @@
-[]
+[
+  {
+    "id": "fee_AZZfYFK6",
+    "cycleId": "cycle_8s20B_oG",
+    "installmentPlanId": "INSTA_1",
+    "categoryConfigs": [
+      {
+        "programId": "lpp_001",
+        "programName": "B.Tech CSE",
+        "category": "Resident Indian",
+        "subcategory": "General",
+        "programFee": 780000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 780000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_001",
+        "programName": "B.Tech CSE",
+        "category": "Resident Indian",
+        "subcategory": "OBC",
+        "programFee": 780000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 780000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_001",
+        "programName": "B.Tech CSE",
+        "category": "Resident Indian",
+        "subcategory": "SC/ST",
+        "programFee": 780000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 780000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_001",
+        "programName": "B.Tech CSE",
+        "category": "NRI",
+        "subcategory": "American",
+        "programFee": 780000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 780000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_001",
+        "programName": "B.Tech CSE",
+        "category": "NRI",
+        "subcategory": "Arab",
+        "programFee": 780000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 780000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_002",
+        "programName": "B.Tech Mechanical",
+        "category": "Resident Indian",
+        "subcategory": "General",
+        "programFee": 700000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 700000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_002",
+        "programName": "B.Tech Mechanical",
+        "category": "Resident Indian",
+        "subcategory": "OBC",
+        "programFee": 700000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 700000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_002",
+        "programName": "B.Tech Mechanical",
+        "category": "Resident Indian",
+        "subcategory": "SC/ST",
+        "programFee": 700000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 700000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_002",
+        "programName": "B.Tech Mechanical",
+        "category": "NRI",
+        "subcategory": "American",
+        "programFee": 700000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 700000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_002",
+        "programName": "B.Tech Mechanical",
+        "category": "NRI",
+        "subcategory": "Arab",
+        "programFee": 700000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 700000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_003",
+        "programName": "B.Tech EXTC",
+        "category": "Resident Indian",
+        "subcategory": "General",
+        "programFee": 740000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 740000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_003",
+        "programName": "B.Tech EXTC",
+        "category": "Resident Indian",
+        "subcategory": "OBC",
+        "programFee": 740000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 740000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_003",
+        "programName": "B.Tech EXTC",
+        "category": "Resident Indian",
+        "subcategory": "SC/ST",
+        "programFee": 740000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 740000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_003",
+        "programName": "B.Tech EXTC",
+        "category": "NRI",
+        "subcategory": "American",
+        "programFee": 740000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 740000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_003",
+        "programName": "B.Tech EXTC",
+        "category": "NRI",
+        "subcategory": "Arab",
+        "programFee": 740000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 740000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_004",
+        "programName": "B.Tech Civil",
+        "category": "Resident Indian",
+        "subcategory": "General",
+        "programFee": 680000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 680000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_004",
+        "programName": "B.Tech Civil",
+        "category": "Resident Indian",
+        "subcategory": "OBC",
+        "programFee": 680000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 680000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_004",
+        "programName": "B.Tech Civil",
+        "category": "Resident Indian",
+        "subcategory": "SC/ST",
+        "programFee": 680000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 680000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_004",
+        "programName": "B.Tech Civil",
+        "category": "NRI",
+        "subcategory": "American",
+        "programFee": 680000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 680000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_004",
+        "programName": "B.Tech Civil",
+        "category": "NRI",
+        "subcategory": "Arab",
+        "programFee": 680000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 680000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_015",
+        "programName": "B.Tech IT",
+        "category": "Resident Indian",
+        "subcategory": "General",
+        "programFee": 720000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 720000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_015",
+        "programName": "B.Tech IT",
+        "category": "Resident Indian",
+        "subcategory": "OBC",
+        "programFee": 720000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 720000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_015",
+        "programName": "B.Tech IT",
+        "category": "Resident Indian",
+        "subcategory": "SC/ST",
+        "programFee": 720000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 720000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_015",
+        "programName": "B.Tech IT",
+        "category": "NRI",
+        "subcategory": "American",
+        "programFee": 720000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 720000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      },
+      {
+        "programId": "lpp_015",
+        "programName": "B.Tech IT",
+        "category": "NRI",
+        "subcategory": "Arab",
+        "programFee": 720000,
+        "installmentPlanId": "INSTA_1",
+        "installmentRows": [
+          {
+            "pct": 100,
+            "amount": 720000,
+            "dueDate": "2026-04-07T09:39"
+          }
+        ]
+      }
+    ],
+    "installmentRows": [],
+    "createdAt": "2026-04-07T04:10:06.073Z",
+    "updatedAt": "2026-04-07T04:10:06.073Z"
+  }
+]

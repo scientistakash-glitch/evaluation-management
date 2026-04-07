@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/common/ToastContext';
+import ProcessingOverlay from '@/components/common/ProcessingOverlay';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -656,6 +657,22 @@ export default function CreateCyclePage() {
     : ['Year & Group', 'Cycle Dates', 'Strategy', 'Criteria & TB', 'Scores & Merit', 'Bulk Offers', 'Fee Config', 'Approval'];
 
   // ── Render ───────────────────────────────────────────────────────────────────
+
+  if (generating) {
+    return (
+      <ProcessingOverlay
+        title="Generating Rankings"
+        subtitle="Processing all student applications and computing the merit list."
+        steps={[
+          'Fetching student applications',
+          'Computing composite scores',
+          'Applying tiebreaker rules',
+          'Sorting merit list',
+          'Finalising rank records',
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="page-container">

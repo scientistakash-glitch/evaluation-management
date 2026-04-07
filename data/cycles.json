@@ -1,11 +1,11 @@
 [
   {
-    "id": "btech-c1",
+    "id": "cycle_8s20B_oG",
     "name": "B.Tech – 2026-2027 – Cycle 1",
-    "ptatId": "ptat_001",
-    "academicYear": "2026-2027",
     "number": 1,
-    "status": "Released",
+    "academicYear": "2026-2027",
+    "hasPreviousCycle": false,
+    "ptatId": "ptat_001",
     "lppIds": [
       "lpp_001",
       "lpp_002",
@@ -13,7 +13,72 @@
       "lpp_004",
       "lpp_015"
     ],
-    "evaluationStrategy": "program-wise",
-    "createdAt": "2026-03-31T15:31:10.899Z"
+    "timeline": {
+      "applicationPeriod": {
+        "start": "",
+        "end": ""
+      },
+      "scoringPeriod": {
+        "start": "",
+        "end": ""
+      },
+      "offerReleasePeriod": {
+        "start": "",
+        "end": ""
+      },
+      "acceptancePeriod": {
+        "start": "",
+        "end": ""
+      },
+      "paymentPeriod": {
+        "start": "",
+        "end": ""
+      }
+    },
+    "evaluationStrategy": "single",
+    "status": "Released",
+    "createdAt": "2026-04-07T04:09:16.734Z",
+    "updatedAt": "2026-04-07T04:10:19.498Z"
+  },
+  {
+    "id": "cycle_7TDJ_PBf",
+    "name": "B.Tech – 2026-2027 – Cycle 2",
+    "number": 2,
+    "academicYear": "2026-2027",
+    "hasPreviousCycle": true,
+    "ptatId": "ptat_001",
+    "lppIds": [
+      "lpp_001",
+      "lpp_002",
+      "lpp_003",
+      "lpp_004",
+      "lpp_015"
+    ],
+    "timeline": {
+      "applicationPeriod": {
+        "start": "",
+        "end": ""
+      },
+      "scoringPeriod": {
+        "start": "",
+        "end": ""
+      },
+      "offerReleasePeriod": {
+        "start": "",
+        "end": ""
+      },
+      "acceptancePeriod": {
+        "start": "",
+        "end": ""
+      },
+      "paymentPeriod": {
+        "start": "",
+        "end": ""
+      }
+    },
+    "evaluationStrategy": "single",
+    "status": "Planned",
+    "createdAt": "2026-04-07T04:10:37.997Z",
+    "updatedAt": "2026-04-07T04:10:37.997Z"
   }
 ]
